@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universal Scanner</title>
+
+<!-- PWA setup: lets the phone install this as a real app icon -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b0e12">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Scanner">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+<!-- ZXing: a well-established, widely-used QR/barcode reading library -->
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js" defer></script>
+
+<style>
+  :root {
+    --bg-deep: #0b0e12;
+    --bg-panel: #141821;
+    --border: rgba(255,255,255,0.09);
+    --accent: #00d9a3;
+    --accent-dark: #06110d;
+    --text-hi: #f3f5f7;
+    --text-mid: #9aa4b2;
+    --pay: #16a34a;
+    --web: #2563eb;
+    --call: #d97706;
+    --mail: #7c3aed;
+    --mono: 'JetBrains Mono', monospace;
+    --display: 'Space Grotesk', sans-serif;
+    --body: 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: var(--body);
+    background: radial-gradient(circle at 50% -10%, var(--bg-panel), var(--bg-deep) 65%);
+    color: var(--text-hi);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 28px 18px 60px;
+  }
+
+  .page { width: 100%; max-width: 420px; }
+
+  header { text-align: center; margin-bottom: 22px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    margin: 0 0 8px 0;
+  }
+  h1 {
+    font-family: var(--display);
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0 0 6px 0;
+  }
+  h1 .accent { color: var(--accent); }
+  .sub {
+    color: var(--text-mid);
+    font-size: 14px;
+    margin: 0;
+  }
+
+  .modeSelector {
+    display: flex;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px;
+    margin: 22px 0 18px 0;
+    gap: 4px;
+  }
+  .modeBtn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-mid);
+    font-family: var(--body);
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 9px 6px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  .modeBtn.active {
+    background: var(--accent);
+    color: var(--accent-dark);
+  }
+
+  .viewfinder {
+    position: relative;
+    background: #000;
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    aspect-ratio: 1 / 1;
+  }
+  #reader { width: 100%; height: 100%; }
+  #video { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
+
+  .corners { position: absolute; inset: 0; pointer-events: none; }
+  .corner {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border: 3px solid var(--accent);
+    opacity: 0.9;
+  }
+  .corner.tl { top: 16px; left: 16px; border-right: none; border-bottom: none; border-radius: 6px 0 0 0; }
+  .corner.tr { top: 16px; right: 16px; border-left: none; border-bottom: none; border-radius: 0 6px 0 0; }
+  .corner.bl { bottom: 16px; left: 16px; border-right: none; border-top: none; border-radius: 0 0 0 6px; }
+  .corner.br { bottom: 16px; right: 16px; border-left: none; border-top: none; border-radius: 0 0 6px 0; }
+
+  .laser {
+    position: absolute;
+    left: 6%;
+    width: 88%;
+    height: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 10px 2px var(--accent);
+    top: 10%;
+    opacity: 0;
+  }
+  .viewfinder.scanning .laser {
+    opacity: 0.85;
+    animation: sweep 2.2s ease-in-out infinite alternate;
+  }
+  @keyframes sweep {
+    from { top: 10%; }
+    to   { top: 88%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .viewfinder.scanning .laser { animation: none; top: 50%; opacity: 0.5; }
+  }
+
+  .primaryBtn {
+    display: block;
+    width: 100%;
+    margin-top: 16px;
+    padding: 14px;
+    background: var(--accent);
+    color: var(--accent-dark);
+    border: none;
+    border-radius: 14px;
+    font-family: var(--body);
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 8px 24px -8px rgba(0,217,163,0.5);
+  }
+  .primaryBtn:disabled { background: #3a4048; color: var(--text-mid); box-shadow: none; cursor: default; }
+  .primaryBtn.ghost {
+    background: transparent;
+    border: 1.5px solid var(--accent);
+    color: var(--accent);
+    box-shadow: none;
+  }
+
+  .status { text-align: center; color: var(--text-mid); font-size: 13px; margin: 10px 0 0 0; }
+
+  .uploadSection { text-align: center; margin-top: 18px; }
+  .orText { color: var(--text-mid); font-size: 12px; margin: 0 0 10px 0; }
+  .secondaryBtn {
+    display: inline-block;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    color: var(--text-hi);
+    padding: 11px 20px;
+    border-radius: 12px;
+    font-family: var(--body);
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .secondaryBtn:hover { background: #1b202b; }
+
+  .modeAsk {
+    margin-top: 18px;
+    padding: 16px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    text-align: center;
+  }
+  .modeAsk p { margin: 0 0 12px 0; font-size: 13.5px; color: var(--text-hi); }
+  .modeAskBtns { display: flex; gap: 8px; }
+  .modeAskBtns .secondaryBtn { flex: 1; }
+
+  .ticket {
+    position: relative;
+    background: #fff;
+    color: #1a1d24;
+    margin-top: 30px;
+    padding: 30px 20px 22px;
+    border-radius: 0 0 18px 18px;
+    border-top: 2px dashed #d8dbe0;
+    box-shadow: 0 20px 45px -12px rgba(0,0,0,0.5);
+  }
+  .ticketNotch {
+    position: absolute;
+    top: -12px;
+    width: 22px;
+    height: 22px;
+    background: var(--bg-deep);
+    border-radius: 50%;
+  }
+  .ticketNotch.left { left: 10px; }
+  .ticketNotch.right { right: 10px; }
+  .ticketLabel {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 2.5px;
+    color: #9aa4b2;
+    margin: 0 0 14px 0;
+  }
+
+  #resultContent pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: var(--mono);
+    font-size: 15px;
+    color: #1a1d24;
+    background: #f4f6f8;
+    padding: 16px;
+    border-radius: 10px;
+    margin: 0;
+  }
+  .actionBtn {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    font-family: var(--body);
+    font-size: 15.5px;
+    font-weight: 700;
+    color: #fff;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    box-sizing: border-box;
+  }
+  .actionBtn.pay { background: var(--pay); }
+  .actionBtn.web { background: var(--web); }
+  .actionBtn.call { background: var(--call); }
+  .actionBtn.mail { background: var(--mail); }
+
+  .copyBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    background: transparent;
+    border: 1px solid #d8dbe0;
+    color: #444;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-family: var(--body);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .hintText { font-size: 12.5px; color: #8993a1; margin: 10px 0 0 0; line-height: 1.4; }
+  .rawLink {
+    margin-top: 12px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: #8993a1;
+    word-break: break-all;
+    background: #f4f6f8;
+    padding: 10px;
+    border-radius: 8px;
+  }
+
+  #scanAgainBtn { margin-top: 20px; }
+
+  a:focus-visible, button:focus-visible, label:focus-visible, input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header>
+    <p class="eyebrow">UNIVERSAL SCANNER</p>
+    <h1>Scan <span class="accent">anything</span></h1>
+    <p class="sub">QR codes, barcodes, ID cards, payment codes.</p>
+  </header>
+
+  <div id="scanArea">
+
+    <div class="modeSelector" role="group" aria-label="Scan mode">
+      <button class="modeBtn active" data-mode="auto" type="button">🔍 Auto</button>
+      <button class="modeBtn" data-mode="qr" type="button">▭ QR Only</button>
+      <button class="modeBtn" data-mode="barcode" type="button">▤ Barcode Only</button>
+    </div>
+
+    <div class="viewfinder" id="viewfinderWrap">
+      <div id="reader"><video id="video" autoplay muted playsinline></video></div>
+      <div class="corners" aria-hidden="true">
+        <span class="corner tl"></span><span class="corner tr"></span>
+        <span class="corner bl"></span><span class="corner br"></span>
+      </div>
+      <div class="laser" aria-hidden="true"></div>
+    </div>
+
+    <button id="startCameraBtn" class="primaryBtn" type="button">▶ Start Camera</button>
+    <p id="status" class="status">Choose a mode, then tap Start Camera.</p>
+
+    <div class="uploadSection">
+      <p class="orText">— or —</p>
+      <label for="fileInput" class="secondaryBtn">📁 Upload a Photo</label>
+      <input type="file" id="fileInput" accept="image/*" hidden>
+    </div>
+
+    <div id="modeAskSection" class="modeAsk" hidden>
+      <p>Couldn't auto-detect that. What did you scan?</p>
+      <div class="modeAskBtns">
+        <button id="retryQrBtn" class="secondaryBtn" type="button">▭ It's a QR Code</button>
+        <button id="retryBarcodeBtn" class="secondaryBtn" type="button">▤ It's a Barcode</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="dashboard" class="ticket" hidden>
+    <div class="ticketNotch left"></div>
+    <div class="ticketNotch right"></div>
+    <p class="ticketLabel">SCAN RESULT</p>
+    <div id="resultContent"></div>
+    <button id="scanAgainBtn" class="primaryBtn ghost" type="button">↻ Scan Again</button>
+  </div>
+
+</div>
+
+<script>
+  const statusEl = document.getElementById('status');
+  const scanArea = document.getElementById('scanArea');
+  const dashboard = document.getElementById('dashboard');
+  const resultContent = document.getElementById('resultContent');
+  const viewfinderWrap = document.getElementById('viewfinderWrap');
+  const videoEl = document.getElementById('video');
+  const fileInput = document.getElementById('fileInput');
+  const startCameraBtn = document.getElementById('startCameraBtn');
+  const modeButtons = document.querySelectorAll('.modeBtn');
+  const modeAskSection = document.getElementById('modeAskSection');
+  const retryQrBtn = document.getElementById('retryQrBtn');
+  const retryBarcodeBtn = document.getElementById('retryBarcodeBtn');
+
+  let codeReader;
+  let currentMode = 'auto';       // 'auto' | 'qr' | 'barcode'
+  let cameraActive = false;
+  let lastUploadedFile = null;
+
+  // ---------- Format sets per mode ----------
+  function formatsForMode(mode) {
+    const BF = ZXing.BarcodeFormat;
+    if (mode === 'qr') return [BF.QR_CODE];
+    if (mode === 'barcode') {
+      return [BF.EAN_13, BF.EAN_8, BF.UPC_A, BF.UPC_E, BF.CODE_128, BF.CODE_39, BF.ITF, BF.PDF_417, BF.DATA_MATRIX, BF.AZTEC, BF.CODABAR];
+    }
+    return [BF.QR_CODE, BF.EAN_13, BF.EAN_8, BF.UPC_A, BF.UPC_E, BF.CODE_128, BF.CODE_39, BF.ITF, BF.PDF_417, BF.DATA_MATRIX, BF.AZTEC, BF.CODABAR];
+  }
+
+  function buildReader(mode) {
+    const hints = new Map();
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formatsForMode(mode));
+    // TRY_HARDER makes 1D barcode decoding more aggressive, which also makes
+    // it more prone to misreading random pixels as a short garbage code.
+    // Only enable it when the user has confirmed exactly what they're
+    // scanning (QR Only / Barcode Only) — not in Auto mode.
+    if (mode !== 'auto') {
+      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    }
+    codeReader = new ZXing.BrowserMultiFormatReader(hints);
+  }
+
+  function safeReset() {
+    if (codeReader) {
+      try { codeReader.reset(); } catch (e) { /* ignore */ }
+    }
+    // Also explicitly stop the camera stream — without this, a stale video
+    // track can linger and bleed into the next scan attempt
+    if (videoEl.srcObject) {
+      try { videoEl.srcObject.getTracks().forEach(t => t.stop()); } catch (e) { /* ignore */ }
+      videoEl.srcObject = null;
+    }
+    cameraActive = false;
+  }
+
+  // ---------- Mode selector ----------
+  modeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      modeButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentMode = btn.dataset.mode;
+      modeAskSection.hidden = true;
+      if (cameraActive) startScanner();
+    });
+  });
+
+  // ---------- Link classification ----------
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function classifyLink(text) {
+    const t = text.trim();
+    if (/^upi:\/\//i.test(t)) return { url: t, label: "💳 Click to Pay", cssClass: "pay", appHint: "your UPI app (GPay / PhonePe / Paytm)" };
+    if (/^tel:/i.test(t)) return { url: t, label: "📞 Click to Call", cssClass: "call", appHint: "your dialer" };
+    if (/^mailto:/i.test(t)) return { url: t, label: "📧 Click to Email", cssClass: "mail", appHint: "your email app" };
+    if (/^https?:\/\//i.test(t) || /^www\./i.test(t)) {
+      const url = t.startsWith("http") ? t : "https://" + t;
+      return { url: url, label: "🔗 Click to Open Link", cssClass: "web", appHint: "your browser" };
+    }
+    return null;
+  }
+
+  // ---------- Handling a successful scan ----------
+  function onScanSuccess(decodedText) {
+    safeReset();
+    viewfinderWrap.classList.remove('scanning');
+    scanArea.style.display = "none";
+    modeAskSection.hidden = true;
+
+    const link = classifyLink(decodedText);
+
+    if (link) {
+      resultContent.innerHTML =
+        `<a class="actionBtn ${link.cssClass}" href="${escapeHtml(link.url)}" target="_blank" rel="noopener">${link.label}</a>` +
+        `<button class="copyBtn" id="copyBtn" type="button">📋 Copy Link</button>` +
+        `<p class="hintText">If tapping doesn't open anything, copy the link and paste it into ${link.appHint}.</p>` +
+        `<div class="rawLink">${escapeHtml(decodedText)}</div>`;
+
+      const copyBtn = document.getElementById('copyBtn');
+      copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(link.url).then(() => {
+          copyBtn.textContent = "✅ Copied!";
+          setTimeout(() => { copyBtn.textContent = "📋 Copy Link"; }, 1500);
+        }).catch(() => {
+          copyBtn.textContent = "Couldn't copy";
+        });
+      });
+    } else {
+      resultContent.innerHTML = `<pre>${escapeHtml(decodedText)}</pre>`;
+    }
+
+    dashboard.hidden = false;
+  }
+
+  // ---------- Live camera ----------
+  async function startScanner() {
+    if (typeof ZXing === "undefined") {
+      statusEl.textContent = "Scanner library failed to load. Check your internet connection and reload.";
+      return;
+    }
+
+    safeReset();
+    buildReader(currentMode);
+
+    dashboard.hidden = true;
+    scanArea.style.display = "block";
+    startCameraBtn.disabled = true;
+    startCameraBtn.textContent = "Starting…";
+    statusEl.textContent = "Requesting camera access…";
+    fileInput.value = "";
+
+    let startTimedOut = false;
+    const startTimeout = setTimeout(() => {
+      startTimedOut = true;
+      startCameraBtn.disabled = false;
+      startCameraBtn.textContent = "▶ Start Camera";
+      statusEl.textContent = "Camera is taking too long to start. Try again, or use Upload below.";
+    }, 12000);
+
+    try {
+      await codeReader.decodeFromConstraints(
+        { video: { facingMode: "environment" } },
+        videoEl,
+        (result, err) => {
+          if (result) {
+            const fmt = result.getBarcodeFormat ? result.getBarcodeFormat() : null;
+            const text = result.getText();
+            // In Auto mode, 1D barcode decoders occasionally misread random
+            // pixels as a short garbage code (e.g. "BOB"). Real barcodes are
+            // essentially never this short, so ignore these and keep scanning.
+            if (currentMode === 'auto' && fmt !== ZXing.BarcodeFormat.QR_CODE && text.trim().length < 5) {
+              return;
+            }
+            onScanSuccess(text);
+          }
+          // err fires on every frame where nothing is found yet — that's normal, ignore it
+        }
+      );
+      clearTimeout(startTimeout);
+      if (startTimedOut) {
+        safeReset();
+        return;
+      }
+      cameraActive = true;
+      startCameraBtn.style.display = "none";
+      viewfinderWrap.classList.add('scanning');
+      statusEl.textContent = "Point your camera at a QR code or barcode…";
+    } catch (err) {
+      clearTimeout(startTimeout);
+      startCameraBtn.disabled = false;
+      startCameraBtn.textContent = "▶ Start Camera";
+      statusEl.textContent = "Camera access failed: " + err + " — check permissions, or use Upload below.";
+    }
+  }
+
+  startCameraBtn.addEventListener('click', startScanner);
+  document.getElementById('scanAgainBtn').addEventListener('click', () => {
+    startCameraBtn.style.display = "block";
+    startCameraBtn.disabled = false;
+    startCameraBtn.textContent = "▶ Start Camera";
+    startScanner();
+  });
+
+  // ---------- Upload a photo ----------
+  function upscaleImage(file, maxDim = 1600) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const longSide = Math.max(img.width, img.height);
+        const targetLongSide = Math.min(maxDim, longSide * 2);
+        const factor = targetLongSide / longSide;
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * factor);
+        canvas.height = Math.round(img.height * factor);
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("canvas export failed")), 'image/png', 1);
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
+  async function scanUploadedFile(file, mode) {
+    if (typeof ZXing === "undefined") {
+      statusEl.textContent = "Scanner library failed to load. Check your internet connection and reload.";
+      return;
+    }
+
+    modeAskSection.hidden = true;
+    scanArea.style.display = "block";
+    dashboard.hidden = true;
+    statusEl.textContent = "Scanning uploaded photo…";
+
+    safeReset();
+    buildReader(mode);
+
+    const blobsToTry = [file];
+    try { blobsToTry.push(await upscaleImage(file)); } catch (e) { /* skip */ }
+
+    for (const blob of blobsToTry) {
+      const url = URL.createObjectURL(blob);
+      try {
+        const result = await codeReader.decodeFromImageUrl(url);
+        URL.revokeObjectURL(url);
+        onScanSuccess(result.getText());
+        return;
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        // try the next version of the image
+      }
+    }
+
+    if (mode === 'auto') {
+      statusEl.textContent = "Couldn't automatically detect a code in that photo.";
+      modeAskSection.hidden = false;
+    } else {
+      statusEl.textContent = "Couldn't find a " + (mode === 'qr' ? "QR code" : "barcode") + " in that photo. Try a clearer, closer, well-lit shot.";
+    }
+  }
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    lastUploadedFile = file;
+    scanUploadedFile(file, currentMode);
+  });
+
+  retryQrBtn.addEventListener('click', () => {
+    if (lastUploadedFile) scanUploadedFile(lastUploadedFile, 'qr');
+  });
+  retryBarcodeBtn.addEventListener('click', () => {
+    if (lastUploadedFile) scanUploadedFile(lastUploadedFile, 'barcode');
+  });
+
+  // No auto-start — browsers (especially mobile Safari) require a real user
+  // tap before they'll show the camera permission prompt.
+
+  // Register the service worker so the browser offers "Add to Home Screen" /
+  // "Install app". This has no effect on scanning itself.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch(() => { /* ignore */ });
+    });
+  }
+</script>
+
+</body>
+</html>
