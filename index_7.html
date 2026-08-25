@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universal Scanner</title>
+
+<!-- PWA setup: lets the phone install this as a real app icon -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b0e12">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Scanner">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+<!-- ZXing: a well-established, widely-used QR/barcode reading library -->
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js" defer></script>
+
+<style>
+  :root {
+    --bg-deep: #0b0e12;
+    --bg-panel: #141821;
+    --border: rgba(255,255,255,0.09);
+    --accent: #00d9a3;
+    --accent2: #7c5cff;
+    --accent-dark: #06110d;
+    --text-hi: #f3f5f7;
+    --text-mid: #9aa4b2;
+    --pay: #16a34a;
+    --web: #2563eb;
+    --call: #d97706;
+    --mail: #7c3aed;
+    --mono: 'JetBrains Mono', monospace;
+    --display: 'Space Grotesk', sans-serif;
+    --body: 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: var(--body);
+    background: radial-gradient(circle at 50% -10%, var(--bg-panel), var(--bg-deep) 65%);
+    color: var(--text-hi);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 28px 18px 60px;
+  }
+
+  .page { width: 100%; max-width: 420px; perspective: 1000px; }
+
+  @keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  header  { animation: fadeSlideUp 0.6s ease both; }
+  #scanArea { animation: fadeSlideUp 0.6s ease both 0.12s; }
+  @media (prefers-reduced-motion: reduce) {
+    header, #scanArea { animation: none; }
+    header::before { animation: none; opacity: 0.7; }
+  }
+
+  header { position: relative; text-align: center; margin-bottom: 22px; }
+  header::before {
+    content: "";
+    position: absolute;
+    top: -70px;
+    left: 50%;
+    width: 280px;
+    height: 280px;
+    background: radial-gradient(circle, rgba(0,217,163,0.28), rgba(124,92,255,0.16) 55%, transparent 72%);
+    filter: blur(28px);
+    transform: translateX(-50%);
+    z-index: -1;
+    pointer-events: none;
+    animation: pulseGlow 4.5s ease-in-out infinite;
+  }
+  @keyframes pulseGlow {
+    0%, 100% { opacity: 0.65; transform: translateX(-50%) scale(1); }
+    50%      { opacity: 1;    transform: translateX(-50%) scale(1.08); }
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    margin: 0 0 8px 0;
+  }
+  h1 {
+    font-family: var(--display);
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0 0 6px 0;
+  }
+  h1 .accent {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .sub {
+    color: var(--text-mid);
+    font-size: 14px;
+    margin: 0;
+  }
+
+  .modeSelector {
+    display: flex;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px;
+    margin: 22px 0 18px 0;
+    gap: 4px;
+  }
+  .modeBtn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-mid);
+    font-family: var(--body);
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 9px 6px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  .modeBtn.active {
+    background: var(--accent);
+    color: var(--accent-dark);
+  }
+
+  .viewfinder {
+    position: relative;
+    background: #000;
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    aspect-ratio: 1 / 1;
+  }
+  .viewfinder::before {
+    content: "";
+    position: absolute;
+    inset: -1.5px;
+    border-radius: 21px;
+    padding: 1.5px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  #reader { width: 100%; height: 100%; }
+  #video { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
+
+  .corners { position: absolute; inset: 0; pointer-events: none; }
+  .corner {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border: 3px solid var(--accent);
+    opacity: 0.9;
+  }
+  .corner.tl { top: 16px; left: 16px; border-right: none; border-bottom: none; border-radius: 6px 0 0 0; }
+  .corner.tr { top: 16px; right: 16px; border-left: none; border-bottom: none; border-radius: 0 6px 0 0; }
+  .corner.bl { bottom: 16px; left: 16px; border-right: none; border-top: none; border-radius: 0 0 0 6px; }
+  .corner.br { bottom: 16px; right: 16px; border-left: none; border-top: none; border-radius: 0 0 6px 0; }
+
+  .laser {
+    position: absolute;
+    left: 6%;
+    width: 88%;
+    height: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 10px 2px var(--accent);
+    top: 10%;
+    opacity: 0;
+  }
+  .viewfinder.scanning .laser {
+    opacity: 0.85;
+    animation: sweep 2.2s ease-in-out infinite alternate;
+  }
+  @keyframes sweep {
+    from { top: 10%; }
+    to   { top: 88%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .viewfinder.scanning .laser { animation: none; top: 50%; opacity: 0.5; }
+  }
+
+  /* Continuous pulsing glow around the whole frame while actively scanning */
+  @keyframes framePulse {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(0,217,163,0.4), 0 0 26px 3px rgba(0,217,163,0.28); }
+    50%      { box-shadow: 0 0 0 2px rgba(124,92,255,0.5), 0 0 32px 6px rgba(124,92,255,0.4); }
+  }
+  .viewfinder.scanning { animation: framePulse 2.2s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) {
+    .viewfinder.scanning { animation: none; box-shadow: 0 0 0 2px rgba(0,217,163,0.4); }
+  }
+
+  /* Detection flash — plays for a moment right when a code locks in */
+  @keyframes cornerFlash {
+    0%   { transform: scale(1);    opacity: 0.9; border-color: var(--accent); }
+    45%  { transform: scale(1.12); opacity: 1;   border-color: #ffffff; }
+    100% { transform: scale(1);    opacity: 0.9; border-color: var(--accent); }
+  }
+  .viewfinder.detected .corner {
+    animation: cornerFlash 0.5s ease;
+  }
+  .viewfinder.detected .laser {
+    animation: none;
+    opacity: 1;
+    top: 50%;
+    background: #ffffff;
+    box-shadow: 0 0 16px 4px #ffffff;
+  }
+  .detectCheck {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .detectCheck svg { filter: drop-shadow(0 4px 14px rgba(0,217,163,0.7)); }
+  @keyframes checkPop {
+    0%   { opacity: 0; transform: scale(0.5); }
+    45%  { opacity: 1; transform: scale(1.18); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  .viewfinder.detected .detectCheck {
+    animation: checkPop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .viewfinder.detected .corner { animation: none; border-color: #ffffff; }
+    .viewfinder.detected .laser { animation: none; }
+    .viewfinder.detected .detectCheck { animation: none; opacity: 1; }
+  }
+
+  /* Frozen camera frame that zooms toward the viewer from the exact spot
+     the code was detected — the "Paytm-style" lock-on effect */
+  .captureCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    z-index: 3;
+  }
+  .captureCanvas.zooming {
+    display: block;
+    animation: zoomToward 0.6s cubic-bezier(0.25, 0.65, 0.2, 1) forwards;
+  }
+  @keyframes zoomToward {
+    0%   { transform: scale(1);    opacity: 1; }
+    65%  { transform: scale(2.1);  opacity: 1; }
+    100% { transform: scale(2.6);  opacity: 0; }
+  }
+
+  /* Expanding ring "ping" marking the exact detected point */
+  .pingRing {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    margin-left: -8px;
+    margin-top: -8px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    background: rgba(0,217,163,0.25);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 4;
+  }
+  .pingRing.pinging {
+    animation: pingPulse 0.6s ease-out forwards;
+  }
+  @keyframes pingPulse {
+    0%   { transform: scale(0.6); opacity: 0.9; }
+    100% { transform: scale(10);  opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .captureCanvas.zooming { animation: none; opacity: 0; }
+    .pingRing.pinging { animation: none; opacity: 0; }
+  }
+
+  .primaryBtn {
+    display: block;
+    width: 100%;
+    margin-top: 16px;
+    padding: 14px;
+    background: var(--accent);
+    color: var(--accent-dark);
+    border: none;
+    border-radius: 14px;
+    font-family: var(--body);
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 8px 24px -8px rgba(0,217,163,0.5);
+  }
+  .primaryBtn:disabled { background: #3a4048; color: var(--text-mid); box-shadow: none; cursor: default; }
+  .primaryBtn.ghost {
+    background: transparent;
+    border: 1.5px solid var(--accent);
+    color: var(--accent);
+    box-shadow: none;
+  }
+
+  /* Branded primary "Scan" CTA — gradient + icon, distinct from other buttons */
+  .scanBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    color: #ffffff;
+    box-shadow: 0 10px 26px -8px rgba(124,92,255,0.55), 0 6px 18px -6px rgba(0,217,163,0.45);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  .scanBtn:active { transform: scale(0.97); }
+  .scanBtn:disabled {
+    background: #3a4048;
+    box-shadow: none;
+    color: var(--text-mid);
+  }
+  .scanIcon { flex-shrink: 0; }
+  .scanBtn:disabled .scanIcon { opacity: 0.5; }
+
+  .status { text-align: center; color: var(--text-mid); font-size: 13px; margin: 10px 0 0 0; }
+
+  .uploadSection { text-align: center; margin-top: 18px; }
+  .orText { color: var(--text-mid); font-size: 12px; margin: 0 0 10px 0; }
+  .secondaryBtn {
+    display: inline-block;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    color: var(--text-hi);
+    padding: 11px 20px;
+    border-radius: 12px;
+    font-family: var(--body);
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .secondaryBtn:hover { background: #1b202b; }
+
+  .modeAsk {
+    margin-top: 18px;
+    padding: 16px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    text-align: center;
+  }
+  .modeAsk p { margin: 0 0 12px 0; font-size: 13.5px; color: var(--text-hi); }
+  .modeAskBtns { display: flex; gap: 8px; }
+  .modeAskBtns .secondaryBtn { flex: 1; }
+
+  .ticket {
+    position: relative;
+    background: #fff;
+    color: #1a1d24;
+    margin-top: 30px;
+    padding: 30px 20px 22px;
+    border-radius: 0 0 18px 18px;
+    border-top: 2px dashed #d8dbe0;
+    box-shadow: 0 20px 45px -12px rgba(0,0,0,0.5);
+  }
+  @keyframes ticketFlipIn {
+    from { opacity: 0; transform: rotateX(75deg) translateY(10px); }
+    to   { opacity: 1; transform: rotateX(0deg) translateY(0); }
+  }
+  .ticket.flipIn {
+    transform-origin: top center;
+    animation: ticketFlipIn 0.5s cubic-bezier(0.25, 0.7, 0.3, 1.05);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ticket.flipIn { animation: none; }
+  }
+  @keyframes scanAreaFlipOut {
+    from { opacity: 1; transform: rotateX(0deg); }
+    to   { opacity: 0; transform: rotateX(-70deg); }
+  }
+  #scanArea.flipOut {
+    transform-origin: bottom center;
+    animation: scanAreaFlipOut 0.4s cubic-bezier(0.4, 0.1, 0.3, 1) forwards;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #scanArea.flipOut { animation: none; opacity: 0; }
+  }
+  .ticketNotch {
+    position: absolute;
+    top: -12px;
+    width: 22px;
+    height: 22px;
+    background: var(--bg-deep);
+    border-radius: 50%;
+  }
+  .ticketNotch.left { left: 10px; }
+  .ticketNotch.right { right: 10px; }
+  .ticketLabel {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 2.5px;
+    color: #9aa4b2;
+    margin: 0 0 14px 0;
+  }
+
+  #resultContent pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: var(--mono);
+    font-size: 15px;
+    color: #1a1d24;
+    background: #f4f6f8;
+    padding: 16px;
+    border-radius: 10px;
+    margin: 0;
+  }
+  .actionBtn {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    font-family: var(--body);
+    font-size: 15.5px;
+    font-weight: 700;
+    color: #fff;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    box-sizing: border-box;
+  }
+  .actionBtn.pay { background: var(--pay); }
+  .verifyBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #eaf1ff;
+    color: #1d4ed8;
+    font-size: 12.5px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 999px;
+    margin-bottom: 12px;
+  }
+  .actionBtn.web { background: var(--web); }
+  .actionBtn.call { background: var(--call); }
+  .actionBtn.mail { background: var(--mail); }
+
+  .copyBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    background: transparent;
+    border: 1px solid #d8dbe0;
+    color: #444;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-family: var(--body);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .hintText { font-size: 12.5px; color: #8993a1; margin: 10px 0 0 0; line-height: 1.4; }
+  .rawLink {
+    margin-top: 12px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: #8993a1;
+    word-break: break-all;
+    background: #f4f6f8;
+    padding: 10px;
+    border-radius: 8px;
+  }
+
+  #scanAgainBtn { margin-top: 20px; }
+
+  a:focus-visible, button:focus-visible, label:focus-visible, input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header>
+    <p class="eyebrow">UNIVERSAL SCANNER</p>
+    <h1>Scan <span class="accent">anything</span></h1>
+    <p class="sub">QR codes, barcodes, ID cards, payment codes.</p>
+  </header>
+
+  <div id="scanArea">
+
+    <div class="modeSelector" role="group" aria-label="Scan mode">
+      <button class="modeBtn active" data-mode="auto" type="button">🔍 Auto</button>
+      <button class="modeBtn" data-mode="qr" type="button">▭ QR Only</button>
+      <button class="modeBtn" data-mode="barcode" type="button">▤ Barcode Only</button>
+    </div>
+
+    <div class="viewfinder" id="viewfinderWrap">
+      <div id="reader"><video id="video" autoplay muted playsinline></video></div>
+      <div class="corners" aria-hidden="true">
+        <span class="corner tl"></span><span class="corner tr"></span>
+        <span class="corner bl"></span><span class="corner br"></span>
+      </div>
+      <div class="laser" aria-hidden="true"></div>
+      <div class="detectCheck" aria-hidden="true">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" fill="var(--accent)"/>
+          <path d="M7.5 12.5L10.5 15.5L16.5 9" stroke="#06110d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <canvas id="captureCanvas" class="captureCanvas" aria-hidden="true"></canvas>
+      <div id="pingRing" class="pingRing" aria-hidden="true"></div>
+    </div>
+
+    <button id="startCameraBtn" class="primaryBtn scanBtn" type="button">
+      <svg class="scanIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M4 8V5a1 1 0 0 1 1-1h3" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
+        <path d="M20 8V5a1 1 0 0 0-1-1h-3" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
+        <path d="M4 16v3a1 1 0 0 0 1 1h3" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
+        <path d="M20 16v3a1 1 0 0 1-1 1h-3" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
+        <circle cx="12" cy="12" r="2.6" fill="currentColor"/>
+      </svg>
+      <span id="startBtnLabel">Scan</span>
+    </button>
+    <p id="status" class="status">Choose a mode, then tap Scan.</p>
+
+    <div class="uploadSection">
+      <p class="orText">— or —</p>
+      <label for="fileInput" class="secondaryBtn">📁 Upload a Photo</label>
+      <input type="file" id="fileInput" accept="image/*" hidden>
+    </div>
+
+    <div id="modeAskSection" class="modeAsk" hidden>
+      <p>Couldn't auto-detect that. What did you scan?</p>
+      <div class="modeAskBtns">
+        <button id="retryQrBtn" class="secondaryBtn" type="button">▭ It's a QR Code</button>
+        <button id="retryBarcodeBtn" class="secondaryBtn" type="button">▤ It's a Barcode</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="dashboard" class="ticket" hidden>
+    <div class="ticketNotch left"></div>
+    <div class="ticketNotch right"></div>
+    <p class="ticketLabel">SCAN RESULT</p>
+    <div id="resultContent"></div>
+    <button id="scanAgainBtn" class="primaryBtn ghost" type="button">↻ Scan Again</button>
+  </div>
+
+</div>
+
+<script>
+  const statusEl = document.getElementById('status');
+  const scanArea = document.getElementById('scanArea');
+  const dashboard = document.getElementById('dashboard');
+  const resultContent = document.getElementById('resultContent');
+  const viewfinderWrap = document.getElementById('viewfinderWrap');
+  const videoEl = document.getElementById('video');
+  const captureCanvas = document.getElementById('captureCanvas');
+  const pingRing = document.getElementById('pingRing');
+  const fileInput = document.getElementById('fileInput');
+  const startCameraBtn = document.getElementById('startCameraBtn');
+  const startBtnLabel = document.getElementById('startBtnLabel');
+  const modeButtons = document.querySelectorAll('.modeBtn');
+  const modeAskSection = document.getElementById('modeAskSection');
+  const retryQrBtn = document.getElementById('retryQrBtn');
+  const retryBarcodeBtn = document.getElementById('retryBarcodeBtn');
+
+  let codeReader;
+  let currentMode = 'auto';       // 'auto' | 'qr' | 'barcode'
+  let cameraActive = false;
+  let lastUploadedFile = null;
+
+  // ---------- Format sets per mode ----------
+  function formatsForMode(mode) {
+    const BF = ZXing.BarcodeFormat;
+    if (mode === 'qr') return [BF.QR_CODE];
+    if (mode === 'barcode') {
+      return [BF.EAN_13, BF.EAN_8, BF.UPC_A, BF.UPC_E, BF.CODE_128, BF.CODE_39, BF.ITF, BF.PDF_417, BF.DATA_MATRIX, BF.AZTEC, BF.CODABAR];
+    }
+    return [BF.QR_CODE, BF.EAN_13, BF.EAN_8, BF.UPC_A, BF.UPC_E, BF.CODE_128, BF.CODE_39, BF.ITF, BF.PDF_417, BF.DATA_MATRIX, BF.AZTEC, BF.CODABAR];
+  }
+
+  function buildReader(mode) {
+    const hints = new Map();
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formatsForMode(mode));
+    // TRY_HARDER makes 1D barcode decoding more aggressive, which also makes
+    // it more prone to misreading random pixels as a short garbage code.
+    // Only enable it when the user has confirmed exactly what they're
+    // scanning (QR Only / Barcode Only) — not in Auto mode.
+    if (mode !== 'auto') {
+      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    }
+    codeReader = new ZXing.BrowserMultiFormatReader(hints);
+  }
+
+  function safeReset() {
+    if (codeReader) {
+      try { codeReader.reset(); } catch (e) { /* ignore */ }
+    }
+    // Also explicitly stop the camera stream — without this, a stale video
+    // track can linger and bleed into the next scan attempt
+    if (videoEl.srcObject) {
+      try { videoEl.srcObject.getTracks().forEach(t => t.stop()); } catch (e) { /* ignore */ }
+      videoEl.srcObject = null;
+    }
+    cameraActive = false;
+  }
+
+  // ---------- Mode selector ----------
+  modeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      modeButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentMode = btn.dataset.mode;
+      modeAskSection.hidden = true;
+      if (cameraActive) startScanner();
+    });
+  });
+
+  // ---------- Link classification ----------
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function classifyLink(text) {
+    const t = text.trim();
+    if (/^upi:\/\//i.test(t)) return { url: t, label: "💳 Click to Pay", cssClass: "pay", appHint: "your UPI app (GPay / PhonePe / Paytm)", externalApp: true };
+    if (/^tel:/i.test(t)) return { url: t, label: "📞 Click to Call", cssClass: "call", appHint: "your dialer", externalApp: true };
+    if (/^mailto:/i.test(t)) return { url: t, label: "📧 Click to Email", cssClass: "mail", appHint: "your email app", externalApp: true };
+    if (/^https?:\/\//i.test(t) || /^www\./i.test(t)) {
+      const url = t.startsWith("http") ? t : "https://" + t;
+      return { url: url, label: "🔗 Click to Open Link", cssClass: "web", appHint: "your browser", externalApp: false };
+    }
+    return null;
+  }
+
+  // ---------- Handling a successful scan ----------
+  // "Lock-on" effect — freezes the camera frame at the moment of detection,
+  // drops a ping right on the code's exact position, then zooms the frozen
+  // frame outward from that spot (like the code is flying toward you)
+  // before revealing the result. Falls back to a simpler flash if we don't
+  // have a usable position (e.g. some barcode formats only give 2 points).
+  function playLockOnEffect(decodedText, points) {
+    const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
+    if (!vw || !vh || !points || points.length < 2) {
+      onScanSuccess(decodedText, true);
+      return;
+    }
+
+    // Capture the current frame before the camera stream gets stopped
+    captureCanvas.width = vw;
+    captureCanvas.height = vh;
+    const ctx = captureCanvas.getContext('2d');
+    ctx.drawImage(videoEl, 0, 0, vw, vh);
+
+    // Bounding box of the detected code, in native video pixel coordinates
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    points.forEach(p => {
+      const x = p.getX ? p.getX() : p.x;
+      const y = p.getY ? p.getY() : p.y;
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+    });
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    // Map that native-pixel point to where it actually appears on screen —
+    // the video is shown with object-fit: cover, which crops/scales it
+    const dispW = viewfinderWrap.clientWidth, dispH = viewfinderWrap.clientHeight;
+    const coverScale = Math.max(dispW / vw, dispH / vh);
+    const offsetX = (vw * coverScale - dispW) / 2;
+    const offsetY = (vh * coverScale - dispH) / 2;
+    const dispX = centerX * coverScale - offsetX;
+    const dispY = centerY * coverScale - offsetY;
+    const originXPct = Math.min(100, Math.max(0, (dispX / dispW) * 100));
+    const originYPct = Math.min(100, Math.max(0, (dispY / dispH) * 100));
+
+    safeReset();
+    viewfinderWrap.classList.remove('scanning');
+    modeAskSection.hidden = true;
+    statusEl.textContent = "✅ Code found";
+
+    // Ping marks the exact spot the code was found
+    pingRing.style.left = `${dispX}px`;
+    pingRing.style.top = `${dispY}px`;
+    pingRing.classList.remove('pinging');
+    void pingRing.offsetWidth;
+    pingRing.classList.add('pinging');
+
+    // The frozen frame zooms outward from that same spot
+    captureCanvas.style.transformOrigin = `${originXPct}% ${originYPct}%`;
+    captureCanvas.classList.remove('zooming');
+    void captureCanvas.offsetWidth;
+    captureCanvas.classList.add('zooming');
+
+    setTimeout(() => {
+      captureCanvas.classList.remove('zooming');
+      pingRing.classList.remove('pinging');
+      scanArea.classList.add('flipOut');
+      setTimeout(() => {
+        scanArea.style.display = "none";
+        scanArea.classList.remove('flipOut');
+        revealResult(decodedText);
+      }, 400);
+    }, 600);
+  }
+
+  function onScanSuccess(decodedText, fromCamera = true) {
+    safeReset();
+    modeAskSection.hidden = true;
+
+    if (fromCamera) {
+      // Freeze the laser, flash the corner brackets, and pop a checkmark —
+      // a clear "locked on" moment instead of the view just vanishing
+      viewfinderWrap.classList.remove('scanning');
+      viewfinderWrap.classList.add('detected');
+      statusEl.textContent = "✅ Code found";
+    } else {
+      statusEl.textContent = "✅ Code found";
+    }
+
+    setTimeout(() => {
+      viewfinderWrap.classList.remove('detected');
+      scanArea.classList.add('flipOut');
+      setTimeout(() => {
+        scanArea.style.display = "none";
+        scanArea.classList.remove('flipOut');
+        revealResult(decodedText);
+      }, 400);
+    }, fromCamera ? 480 : 260);
+  }
+
+  function revealResult(decodedText) {
+    const link = classifyLink(decodedText);
+
+    if (link) {
+      const targetAttr = link.externalApp ? "" : ` target="_blank" rel="noopener"`;
+      const badge = link.cssClass === "pay"
+        ? `<div class="verifyBadge"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#2563eb"/><path d="M7.5 12.5L10.5 15.5L16.5 9" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>UPI Payment Code Detected</div>`
+        : "";
+      resultContent.innerHTML =
+        badge +
+        `<a class="actionBtn ${link.cssClass}" href="${escapeHtml(link.url)}"${targetAttr}>${link.label}</a>` +
+        `<button class="copyBtn" id="copyBtn" type="button">📋 Copy Link</button>` +
+        `<p class="hintText">If tapping doesn't open anything, copy the link and paste it into ${link.appHint}.</p>` +
+        `<div class="rawLink">${escapeHtml(decodedText)}</div>`;
+
+      const copyBtn = document.getElementById('copyBtn');
+      copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(link.url).then(() => {
+          copyBtn.textContent = "✅ Copied!";
+          setTimeout(() => { copyBtn.textContent = "📋 Copy Link"; }, 1500);
+        }).catch(() => {
+          copyBtn.textContent = "Couldn't copy";
+        });
+      });
+    } else {
+      resultContent.innerHTML = `<pre>${escapeHtml(decodedText)}</pre>`;
+    }
+
+    dashboard.hidden = false;
+    // Retrigger the flip-in animation even if the ticket was already shown before
+    dashboard.classList.remove('flipIn');
+    void dashboard.offsetWidth;
+    dashboard.classList.add('flipIn');
+  }
+
+  // ---------- Live camera ----------
+  async function startScanner() {
+    if (typeof ZXing === "undefined") {
+      statusEl.textContent = "Scanner library failed to load. Check your internet connection and reload.";
+      return;
+    }
+
+    safeReset();
+    buildReader(currentMode);
+
+    dashboard.hidden = true;
+    scanArea.style.display = "block";
+    scanArea.classList.remove('flipOut');
+    captureCanvas.classList.remove('zooming');
+    pingRing.classList.remove('pinging');
+    startCameraBtn.disabled = true;
+    startBtnLabel.textContent = "Starting…";
+    statusEl.textContent = "Requesting camera access…";
+    fileInput.value = "";
+
+    let startTimedOut = false;
+    const startTimeout = setTimeout(() => {
+      startTimedOut = true;
+      startCameraBtn.disabled = false;
+      startBtnLabel.textContent = "Scan";
+      statusEl.textContent = "Camera is taking too long to start. Try again, or use Upload below.";
+    }, 12000);
+
+    try {
+      await codeReader.decodeFromConstraints(
+        { video: { facingMode: "environment" } },
+        videoEl,
+        (result, err) => {
+          if (result) {
+            const fmt = result.getBarcodeFormat ? result.getBarcodeFormat() : null;
+            const text = result.getText();
+            // In Auto mode, 1D barcode decoders occasionally misread random
+            // pixels as a short garbage code (e.g. "BOB"). Real barcodes are
+            // essentially never this short, so ignore these and keep scanning.
+            if (currentMode === 'auto' && fmt !== ZXing.BarcodeFormat.QR_CODE && text.trim().length < 5) {
+              return;
+            }
+            const points = (result.getResultPoints && result.getResultPoints()) || [];
+            playLockOnEffect(text, points);
+          }
+          // err fires on every frame where nothing is found yet — that's normal, ignore it
+        }
+      );
+      clearTimeout(startTimeout);
+      if (startTimedOut) {
+        safeReset();
+        return;
+      }
+      cameraActive = true;
+      startCameraBtn.style.display = "none";
+      viewfinderWrap.classList.add('scanning');
+      statusEl.textContent = "Point your camera at a QR code or barcode…";
+    } catch (err) {
+      clearTimeout(startTimeout);
+      startCameraBtn.disabled = false;
+      startBtnLabel.textContent = "Scan";
+      statusEl.textContent = "Camera access failed: " + err + " — check permissions, or use Upload below.";
+    }
+  }
+
+  startCameraBtn.addEventListener('click', startScanner);
+  document.getElementById('scanAgainBtn').addEventListener('click', () => {
+    startCameraBtn.style.display = "block";
+    startCameraBtn.disabled = false;
+    startBtnLabel.textContent = "Scan";
+    startScanner();
+  });
+
+  // ---------- Upload a photo ----------
+  // Redraws the image at a specific size. ZXing (the JS decoder) often
+  // struggles with very large, high-resolution photos — especially ones with
+  // a logo in the center, like most UPI QR codes — so trying a few different
+  // sizes (including smaller ones) gives it a much better shot than only
+  // ever trying the original photo.
+  function resizeImage(file, targetLongSide) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const longSide = Math.max(img.width, img.height);
+        const factor = targetLongSide / longSide;
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * factor));
+        canvas.height = Math.max(1, Math.round(img.height * factor));
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("canvas export failed")), 'image/png', 1);
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
+  async function scanUploadedFile(file, mode) {
+    if (typeof ZXing === "undefined") {
+      statusEl.textContent = "Scanner library failed to load. Check your internet connection and reload.";
+      return;
+    }
+
+    modeAskSection.hidden = true;
+    scanArea.style.display = "block";
+    dashboard.hidden = true;
+    statusEl.textContent = "Scanning uploaded photo…";
+
+    safeReset();
+    buildReader(mode);
+
+    // Try the original photo first, then a range of resized versions —
+    // large photos (especially with a logo in the middle) often decode
+    // better once scaled down, not just up
+    const attempts = [null, 1000, 700, 450, 1600];
+
+    for (const targetSize of attempts) {
+      let blob;
+      try {
+        blob = targetSize === null ? file : await resizeImage(file, targetSize);
+      } catch (e) {
+        continue;
+      }
+      const url = URL.createObjectURL(blob);
+      try {
+        const result = await codeReader.decodeFromImageUrl(url);
+        URL.revokeObjectURL(url);
+        onScanSuccess(result.getText(), false);
+        return;
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        // try the next size
+      }
+    }
+
+    if (mode === 'auto') {
+      statusEl.textContent = "Couldn't automatically detect a code in that photo.";
+      modeAskSection.hidden = false;
+    } else {
+      statusEl.textContent = "Couldn't find a " + (mode === 'qr' ? "QR code" : "barcode") + " in that photo. Try a clearer, closer, well-lit shot.";
+    }
+  }
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    lastUploadedFile = file;
+    scanUploadedFile(file, currentMode);
+  });
+
+  retryQrBtn.addEventListener('click', () => {
+    if (lastUploadedFile) scanUploadedFile(lastUploadedFile, 'qr');
+  });
+  retryBarcodeBtn.addEventListener('click', () => {
+    if (lastUploadedFile) scanUploadedFile(lastUploadedFile, 'barcode');
+  });
+
+  // No auto-start — browsers (especially mobile Safari) require a real user
+  // tap before they'll show the camera permission prompt.
+
+  // Register the service worker so the browser offers "Add to Home Screen" /
+  // "Install app". This has no effect on scanning itself.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch(() => { /* ignore */ });
+    });
+  }
+</script>
+
+</body>
+</html>
