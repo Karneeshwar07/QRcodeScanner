@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Universal Scanner</title>
+<title>Universal Scanner & Gamified Payments</title>
 
 <!-- PWA setup: lets the phone install this as a real app icon -->
 <link rel="manifest" href="manifest.json">
@@ -14,14 +14,13 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Scanner">
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://googleapis.com">
+<link rel="preconnect" href="https://gstatic.com" crossorigin>
+<link href="https://googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 
-<!-- ZXing: a well-established, widely-used QR/barcode reading library -->
-<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js" defer></script>
-<!-- For generating QR codes (the "Generate" tab) -->
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js" defer></script>
+<!-- Third-Party Core Engines (Loaded synchronously to resolve compilation errors) -->
+<script src="https://jsdelivr.net"></script>
+<script src="https://cloudflare.com"></script>
 
 <style>
   :root {
@@ -31,12 +30,9 @@
     --accent: #00d9a3;
     --accent2: #7c5cff;
     --accent-dark: #06110d;
+    --gold: #f59e0b;
     --text-hi: #f3f5f7;
     --text-mid: #9aa4b2;
-    --pay: #16a34a;
-    --web: #2563eb;
-    --call: #d97706;
-    --mail: #7c3aed;
     --mono: 'JetBrains Mono', monospace;
     --display: 'Space Grotesk', sans-serif;
     --body: 'Inter', sans-serif;
@@ -52,20 +48,45 @@
     min-height: 100vh;
     display: flex;
     justify-content: center;
-    padding: 28px 18px 60px;
+    padding: 20px 18px 60px;
+    overflow-x: hidden;
   }
 
-  .page { width: 100%; max-width: 420px; perspective: 1000px; }
-
-  @keyframes fadeSlideUp {
-    from { opacity: 0; transform: translateY(16px); }
-    to   { opacity: 1; transform: translateY(0); }
+  /* UPGRADE: Premium App-Wide Entrance Intro Transition Container */
+  .page { 
+    width: 100%; 
+    max-width: 420px; 
+    perspective: 1000px;
+    opacity: 0;
+    transform: translateY(24px) scale(0.98);
+    animation: appEntranceIntro 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
-  header  { animation: fadeSlideUp 0.6s ease both; }
-  #scanArea { animation: fadeSlideUp 0.6s ease both 0.12s; }
-  @media (prefers-reduced-motion: reduce) {
-    header, #scanArea { animation: none; }
-    header::before { animation: none; opacity: 0.7; }
+
+  @keyframes appEntranceIntro {
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  /* Dynamic Header Stats Row */
+  .stats-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    padding: 10px 16px;
+    border-radius: 999px;
+    margin-bottom: 20px;
+  }
+  .coin-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    color: var(--gold);
+    font-weight: 700;
   }
 
   header { position: relative; text-align: center; margin-bottom: 22px; }
@@ -87,6 +108,7 @@
     0%, 100% { opacity: 0.65; transform: translateX(-50%) scale(1); }
     50%      { opacity: 1;    transform: translateX(-50%) scale(1.08); }
   }
+  
   .eyebrow {
     font-family: var(--mono);
     font-size: 12px;
@@ -135,8 +157,8 @@
     transition: background 0.2s, color 0.2s;
   }
   .modeBtn.active {
-    background: var(--accent);
-    color: var(--accent-dark);
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #ffffff;
   }
 
   .viewfinder {
@@ -147,20 +169,6 @@
     border: 1px solid var(--border);
     aspect-ratio: 1 / 1;
   }
-  .viewfinder::before {
-    content: "";
-    position: absolute;
-    inset: -1.5px;
-    border-radius: 21px;
-    padding: 1.5px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    opacity: 0.55;
-    pointer-events: none;
-  }
-  #reader { width: 100%; height: 100%; }
   #video { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
 
   .corners { position: absolute; inset: 0; pointer-events: none; }
@@ -176,1204 +184,141 @@
   .corner.bl { bottom: 16px; left: 16px; border-right: none; border-top: none; border-radius: 0 0 0 6px; }
   .corner.br { bottom: 16px; right: 16px; border-left: none; border-top: none; border-radius: 0 0 6px 0; }
 
+  /* UPGRADE: Hardware Accelerated Ultra-Smooth Scanning Laser Line Animation */
   .laser {
     position: absolute;
     left: 6%;
     width: 88%;
-    height: 2px;
-    background: var(--accent);
-    box-shadow: 0 0 10px 2px var(--accent);
-    top: 10%;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    box-shadow: 0 0 14px 3px var(--accent);
+    top: 0;
     opacity: 0;
+    will-change: transform;
   }
   .viewfinder.scanning .laser {
-    opacity: 0.85;
-    animation: sweep 2.2s ease-in-out infinite alternate;
+    opacity: 0.95;
+    animation: smoothLaserSweep 1.8s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
   }
-  @keyframes sweep {
-    from { top: 10%; }
-    to   { top: 88%; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .viewfinder.scanning .laser { animation: none; top: 50%; opacity: 0.5; }
+  @keyframes smoothLaserSweep {
+    from { transform: translateY(25px); }
+    to   { transform: translateY(375px); }
   }
 
-  /* Continuous pulsing glow around the whole frame while actively scanning */
   @keyframes framePulse {
     0%, 100% { box-shadow: 0 0 0 2px rgba(0,217,163,0.4), 0 0 26px 3px rgba(0,217,163,0.28); }
     50%      { box-shadow: 0 0 0 2px rgba(124,92,255,0.5), 0 0 32px 6px rgba(124,92,255,0.4); }
   }
   .viewfinder.scanning { animation: framePulse 2.2s ease-in-out infinite; }
-  @media (prefers-reduced-motion: reduce) {
-    .viewfinder.scanning { animation: none; box-shadow: 0 0 0 2px rgba(0,217,163,0.4); }
-  }
 
-  /* Detection flash — plays for a moment right when a code locks in */
-  @keyframes cornerFlash {
-    0%   { transform: scale(1);    opacity: 0.9; border-color: var(--accent); }
-    45%  { transform: scale(1.12); opacity: 1;   border-color: #ffffff; }
-    100% { transform: scale(1);    opacity: 0.9; border-color: var(--accent); }
-  }
-  .viewfinder.detected .corner {
-    animation: cornerFlash 0.5s ease;
-  }
-  .viewfinder.detected .laser {
-    animation: none;
-    opacity: 1;
-    top: 50%;
-    background: #ffffff;
-    box-shadow: 0 0 16px 4px #ffffff;
-  }
-  .detectCheck {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    pointer-events: none;
-  }
-  .detectCheck svg { filter: drop-shadow(0 4px 14px rgba(0,217,163,0.7)); }
-  @keyframes checkPop {
-    0%   { opacity: 0; transform: scale(0.5); }
-    45%  { opacity: 1; transform: scale(1.18); }
-    100% { opacity: 1; transform: scale(1); }
-  }
-  .viewfinder.detected .detectCheck {
-    animation: checkPop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3);
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .viewfinder.detected .corner { animation: none; border-color: #ffffff; }
-    .viewfinder.detected .laser { animation: none; }
-    .viewfinder.detected .detectCheck { animation: none; opacity: 1; }
-  }
-
-  /* Frozen camera frame that zooms toward the viewer from the exact spot
-     the code was detected — the "Paytm-style" lock-on effect */
-  .captureCanvas {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    display: none;
-    z-index: 3;
-  }
-  .captureCanvas.zooming {
-    display: block;
-    animation: zoomToward 0.6s cubic-bezier(0.25, 0.65, 0.2, 1) forwards;
-  }
-  @keyframes zoomToward {
-    0%   { transform: scale(1);    opacity: 1; }
-    65%  { transform: scale(2.1);  opacity: 1; }
-    100% { transform: scale(2.6);  opacity: 0; }
-  }
-
-  /* Expanding ring "ping" marking the exact detected point */
-  .pingRing {
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    margin-left: -8px;
-    margin-top: -8px;
-    border-radius: 50%;
-    border: 2px solid var(--accent);
-    background: rgba(0,217,163,0.25);
-    opacity: 0;
-    pointer-events: none;
-    z-index: 4;
-  }
-  .pingRing.pinging {
-    animation: pingPulse 0.6s ease-out forwards;
-  }
-  @keyframes pingPulse {
-    0%   { transform: scale(0.6); opacity: 0.9; }
-    100% { transform: scale(10);  opacity: 0; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .captureCanvas.zooming { animation: none; opacity: 0; }
-    .pingRing.pinging { animation: none; opacity: 0; }
-  }
-
-  .primaryBtn {
-    display: block;
-    width: 100%;
-    margin-top: 16px;
-    padding: 14px;
-    background: var(--accent);
-    color: var(--accent-dark);
-    border: none;
-    border-radius: 14px;
-    font-family: var(--body);
-    font-weight: 700;
-    font-size: 14px;
-    letter-spacing: 0.4px;
-    text-transform: uppercase;
-    cursor: pointer;
-    box-shadow: 0 8px 24px -8px rgba(0,217,163,0.5);
-  }
-  .primaryBtn:disabled { background: #3a4048; color: var(--text-mid); box-shadow: none; cursor: default; }
-  .primaryBtn.ghost {
-    background: transparent;
-    border: 1.5px solid var(--accent);
-    color: var(--accent);
-    box-shadow: none;
-  }
-
-  /* Branded primary "Scan" CTA — gradient + icon, distinct from other buttons */
-  .scanBtn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
-    color: #ffffff;
-    box-shadow: 0 10px 26px -8px rgba(124,92,255,0.55), 0 6px 18px -6px rgba(0,217,163,0.45);
-    transition: transform 0.12s ease, box-shadow 0.12s ease;
-  }
-  .scanBtn:active { transform: scale(0.97); }
-  .scanBtn:disabled {
-    background: #3a4048;
-    box-shadow: none;
-    color: var(--text-mid);
-  }
-  .scanIcon { flex-shrink: 0; }
-  .scanBtn:disabled .scanIcon { opacity: 0.5; }
-
-  .status { text-align: center; color: var(--text-mid); font-size: 13px; margin: 10px 0 0 0; }
-
-  .uploadSection { text-align: center; margin-top: 18px; }
-
-  /* Tab bar */
-  .tabBar {
-    display: flex;
-    background: var(--bg-panel);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 4px;
-    margin-bottom: 20px;
-    gap: 4px;
-  }
-  .tabBtn {
-    flex: 1;
-    background: transparent;
-    border: none;
-    color: var(--text-mid);
-    font-family: var(--body);
-    font-size: 13px;
-    font-weight: 600;
-    padding: 10px 6px;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: background 0.2s, color 0.2s;
-  }
-  .tabBtn.active {
-    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
-    color: #fff;
-  }
-  .tabPanel[hidden] { display: none; }
-  .tabIntro { color: var(--text-mid); font-size: 13.5px; margin: 0 0 14px 0; }
-
-  /* Torch button, floats top-right of the viewfinder */
-  .torchBtn {
-    position: absolute;
-    top: 14px;
-    right: 14px;
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    background: rgba(0,0,0,0.5);
-    border: 1px solid rgba(255,255,255,0.2);
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    backdrop-filter: blur(4px);
-  }
-  .torchBtn.on { background: var(--accent); color: var(--accent-dark); border-color: var(--accent); }
-
-  /* Generate QR tab */
-  .genInput {
-    width: 100%;
-    background: var(--bg-panel);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    color: var(--text-hi);
-    font-family: var(--body);
-    font-size: 15px;
-    padding: 14px;
-    resize: vertical;
-    box-sizing: border-box;
-    margin-bottom: 14px;
-  }
-  .genInput:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .genResult { margin-top: 20px; text-align: center; }
-  .qrCanvasWrap {
-    display: inline-block;
-    background: #fff;
-    padding: 16px;
-    border-radius: 16px;
-    box-shadow: 0 20px 45px -12px rgba(0,0,0,0.6);
-  }
-  .qrCanvasWrap canvas { display: block; max-width: 100%; height: auto; }
-  .genActions { display: flex; gap: 10px; margin-top: 16px; }
-  .genActions .secondaryBtn { flex: 1; }
-
-  /* History tab */
-  .historyHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-  .clearBtn {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-mid);
-    font-size: 12.5px;
-    padding: 6px 12px;
-    border-radius: 8px;
-    cursor: pointer;
-  }
-  .historyEmpty { color: var(--text-mid); font-size: 13.5px; text-align: center; padding: 30px 10px; }
-  .historyList { display: flex; flex-direction: column; gap: 10px; }
-  .historyItem {
-    background: var(--bg-panel);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 14px;
-    cursor: pointer;
-  }
-  .historyItem:hover { background: #1b202b; }
-  .historyTop { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-  .historyTypeBadge {
-    font-size: 11px;
-    font-weight: 700;
-    padding: 3px 9px;
-    border-radius: 999px;
-    letter-spacing: 0.4px;
-  }
-  .historyTypeBadge.pay { background: rgba(22,163,74,0.18); color: #4ade80; }
-  .historyTypeBadge.web { background: rgba(37,99,235,0.18); color: #7fa8ff; }
-  .historyTypeBadge.call { background: rgba(217,119,6,0.18); color: #fbbf24; }
-  .historyTypeBadge.mail { background: rgba(124,92,255,0.18); color: #b8a6ff; }
-  .historyTypeBadge.text { background: rgba(0,217,163,0.18); color: var(--accent); }
-  .historyTime { font-size: 11.5px; color: var(--text-mid); margin-left: auto; }
-  .historyText {
-    font-family: var(--mono);
-    font-size: 13px;
-    color: var(--text-hi);
-    word-break: break-all;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .orText { color: var(--text-mid); font-size: 12px; margin: 0 0 10px 0; }
-  .secondaryBtn {
-    display: inline-block;
-    background: var(--bg-panel);
-    border: 1px solid var(--border);
-    color: var(--text-hi);
-    padding: 11px 20px;
-    border-radius: 12px;
-    font-family: var(--body);
-    font-size: 13.5px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .secondaryBtn:hover { background: #1b202b; }
-
-  .modeAsk {
+  /* Generator Input Components Layout */
+  .inputContainer {
     margin-top: 18px;
-    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  textarea {
+    width: 100%;
+    height: 100px;
     background: var(--bg-panel);
     border: 1px solid var(--border);
     border-radius: 14px;
-    text-align: center;
-  }
-  .modeAsk p { margin: 0 0 12px 0; font-size: 13.5px; color: var(--text-hi); }
-  .modeAskBtns { display: flex; gap: 8px; }
-  .modeAskBtns .secondaryBtn { flex: 1; }
-
-  .ticket {
-    position: relative;
-    background: var(--bg-panel);
-    color: var(--text-hi);
-    margin-top: 30px;
-    padding: 30px 20px 22px;
-    border-radius: 20px;
-    border: 1px solid var(--border);
-    border-top: 2px solid var(--accent);
-    box-shadow: 0 20px 45px -12px rgba(0,0,0,0.6);
-  }
-  .ticket::before {
-    content: "";
-    position: absolute;
-    top: -50px;
-    left: 50%;
-    width: 280px;
-    height: 200px;
-    transform: translateX(-50%);
-    background: radial-gradient(circle, var(--ticket-glow, rgba(0,217,163,0.35)), transparent 70%);
-    filter: blur(32px);
-    z-index: -1;
-    pointer-events: none;
-  }
-  @keyframes ticketFlipIn {
-    from { opacity: 0; transform: rotateX(75deg) translateY(10px); }
-    to   { opacity: 1; transform: rotateX(0deg) translateY(0); }
-  }
-  .ticket.flipIn {
-    transform-origin: top center;
-    animation: ticketFlipIn 0.5s cubic-bezier(0.25, 0.7, 0.3, 1.05);
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .ticket.flipIn { animation: none; }
-  }
-  @keyframes scanAreaFlipOut {
-    from { opacity: 1; transform: rotateX(0deg); }
-    to   { opacity: 0; transform: rotateX(-70deg); }
-  }
-  #scanArea.flipOut {
-    transform-origin: bottom center;
-    animation: scanAreaFlipOut 0.4s cubic-bezier(0.4, 0.1, 0.3, 1) forwards;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    #scanArea.flipOut { animation: none; opacity: 0; }
-  }
-  .ticketNotch {
-    position: absolute;
-    top: -12px;
-    width: 22px;
-    height: 22px;
-    background: var(--bg-deep);
-    border-radius: 50%;
-  }
-  .ticketNotch.left { left: 10px; }
-  .ticketNotch.right { right: 10px; }
-  .ticketLabel {
-    font-family: var(--mono);
-    font-size: 11px;
-    letter-spacing: 2.5px;
-    color: #9aa4b2;
-    margin: 0 0 14px 0;
-  }
-
-  #resultContent pre {
-    white-space: pre-wrap;
-    word-break: break-word;
-    font-family: var(--mono);
-    font-size: 15px;
-    color: var(--text-hi);
-    background: var(--bg-deep);
-    border: 1px solid var(--border);
-    padding: 16px;
-    border-radius: 10px;
-    margin: 0;
-  }
-  .actionBtn {
-    display: block;
-    width: 100%;
     padding: 14px;
-    border: none;
-    border-radius: 12px;
-    font-family: var(--body);
-    font-size: 15.5px;
-    font-weight: 700;
-    color: #fff;
-    text-align: center;
-    text-decoration: none;
-    cursor: pointer;
-    box-sizing: border-box;
-  }
-  .actionBtn.pay { background: var(--pay); }
-  .verifyBadge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(37,99,235,0.18);
-    color: #7fa8ff;
-    font-size: 12.5px;
-    font-weight: 700;
-    padding: 6px 12px;
-    border-radius: 999px;
-    margin-bottom: 12px;
-  }
-  .actionBtn.web { background: var(--web); }
-  .actionBtn.call { background: var(--call); }
-  .actionBtn.mail { background: var(--mail); }
-
-  .copyBtn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 10px;
-    background: transparent;
-    border: 1px solid var(--border);
     color: var(--text-hi);
-    padding: 8px 14px;
-    border-radius: 8px;
     font-family: var(--body);
-    font-size: 13px;
+    font-size: 14px;
+    resize: none;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  textarea:focus { border-color: var(--accent); }
+  
+  .generateBtn {
+    width: 100%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none;
+    border-radius: 14px;
+    padding: 14px;
+    color: white;
+    font-family: var(--display);
+    font-size: 15px;
+    font-weight: 700;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: opacity 0.2s;
   }
-  .hintText { font-size: 12.5px; color: var(--text-mid); margin: 10px 0 0 0; line-height: 1.4; }
-  .rawLink {
-    margin-top: 12px;
-    font-family: var(--mono);
-    font-size: 11.5px;
-    color: var(--text-mid);
-    word-break: break-all;
-    background: var(--bg-deep);
-    border: 1px solid var(--border);
-    padding: 10px;
-    border-radius: 8px;
+  .generateBtn:hover { opacity: 0.9; }
+  
+  #qrResult {
+    margin-top: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 20px;
+    width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
   }
 
-  #scanAgainBtn { margin-top: 20px; }
-
-  a:focus-visible, button:focus-visible, label:focus-visible, input:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
+  /* Active Anime/Hero Canvas Overlay Popup System Layout */
+  .animation-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(11, 14, 18, 0.96);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border-radius: 20px;
+    padding: 20px;
   }
+  
+  /* Arc Reactor Visualization Graphic Rules */
+  .arc-reactor {
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    border: 4px dashed var(--accent);
+    box-shadow: 0 0 35px rgba(0,217,163,0.6);
+    animation: rotateEngine 3s linear infinite;
+    margin-bottom: 22px;
+    transition: all 0.3s ease;
+  }
+  @keyframes rotateEngine { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  /* Interactive Custom Cosmetics Shop Grid Layout */
+  .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+  .shop-item { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 16px; padding: 14px; text-align: center; transition: all 0.2s ease; }
+  .shop-item.equipped { border-color: var(--accent); box-shadow: 0 0 15px rgba(0,217,163,0.15); }
+  .price-tag { color: var(--gold); font-family: var(--mono); font-size: 13px; font-weight: bold; margin: 8px 0; }
+  
+  .action-btn {
+    width: 100%; background: rgba(255,255,255,0.06); border: 1px solid var(--border); padding: 9px; border-radius: 10px; color: #fff; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: background 0.2s;
+  }
+  .action-btn:hover { background: rgba(255,255,255,0.12); }
+  .action-btn.buy { background: var(--accent2); border: none; }
+  .action-btn.buy:hover { opacity: 0.9; }
+
+  .earn-ad-btn {
+    width: 100%; background: linear-gradient(135deg, #f59e0b, #d97706); border: none; padding: 14px; border-radius: 14px; color: white; font-family: var(--display); font-size: 14px; font-weight: 700; cursor: pointer; margin-bottom: 18px; box-shadow: 0 4px 15px rgba(245,158,11,0.2);
+  }
+
+  .hidden { display: none !important; }
 </style>
 </head>
 <body>
 
 <div class="page">
-
-  <header>
-    <p class="eyebrow">UNIVERSAL SCANNER</p>
-    <h1>Scan <span class="accent">anything</span></h1>
-    <p class="sub">QR codes, barcodes, ID cards, payment codes.</p>
-  </header>
-
-  <div class="tabBar" role="tablist" aria-label="Sections">
-    <button class="tabBtn active" data-tab="scan" type="button">🔍 Scan</button>
-    <button class="tabBtn" data-tab="generate" type="button">➕ Generate</button>
-    <button class="tabBtn" data-tab="history" type="button">🕘 History</button>
-  </div>
-
-  <div id="scanTab" class="tabPanel">
-
-  <div id="scanArea">
-
-    <div class="modeSelector" role="group" aria-label="Scan mode">
-      <button class="modeBtn active" data-mode="auto" type="button">🔍 Auto</button>
-      <button class="modeBtn" data-mode="qr" type="button">▭ QR Only</button>
-      <button class="modeBtn" data-mode="barcode" type="button">▤ Barcode Only</button>
-    </div>
-
-    <div class="viewfinder" id="viewfinderWrap">
-      <div id="reader"><video id="video" autoplay muted playsinline></video></div>
-      <div class="corners" aria-hidden="true">
-        <span class="corner tl"></span><span class="corner tr"></span>
-        <span class="corner bl"></span><span class="corner br"></span>
-      </div>
-      <div class="laser" aria-hidden="true"></div>
-      <div class="detectCheck" aria-hidden="true">
-        <svg width="56" height="56" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="10" fill="var(--accent)"/>
-          <path d="M7.5 12.5L10.5 15.5L16.5 9" stroke="#06110d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      <canvas id="captureCanvas" class="captureCanvas" aria-hidden="true"></canvas>
-      <div id="pingRing" class="pingRing" aria-hidden="true"></div>
-      <button id="torchBtn" class="torchBtn" type="button" hidden aria-label="Toggle flashlight">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 2h6l-1 7h3l-8 13 1-9H7l2-11z" fill="currentColor"/></svg>
-      </button>
-    </div>
-
-    <button id="startCameraBtn" class="primaryBtn scanBtn" type="button">
-      <svg class="scanIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M4 8V5a1 1 0 0 1 1-1h3" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
-        <path d="M20 8V5a1 1 0 0 0-1-1h-3" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
-        <path d="M4 16v3a1 1 0 0 0 1 1h3" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
-        <path d="M20 16v3a1 1 0 0 1-1 1h-3" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
-        <circle cx="12" cy="12" r="2.6" fill="currentColor"/>
-      </svg>
-      <span id="startBtnLabel">Scan</span>
-    </button>
-    <p id="status" class="status">Choose a mode, then tap Scan.</p>
-
-    <div class="uploadSection">
-      <p class="orText">— or —</p>
-      <label for="fileInput" class="secondaryBtn">📁 Upload a Photo</label>
-      <input type="file" id="fileInput" accept="image/*" hidden>
-    </div>
-
-    <div id="modeAskSection" class="modeAsk" hidden>
-      <p>Couldn't auto-detect that. What did you scan?</p>
-      <div class="modeAskBtns">
-        <button id="retryQrBtn" class="secondaryBtn" type="button">▭ It's a QR Code</button>
-        <button id="retryBarcodeBtn" class="secondaryBtn" type="button">▤ It's a Barcode</button>
-      </div>
-    </div>
-
-  </div>
-
-  <div id="dashboard" class="ticket" hidden>
-    <div class="ticketNotch left"></div>
-    <div class="ticketNotch right"></div>
-    <p class="ticketLabel">SCAN RESULT</p>
-    <div id="resultContent"></div>
-    <button id="scanAgainBtn" class="primaryBtn ghost" type="button">↻ Scan Again</button>
-  </div>
-
-  </div>
-
-  <div id="generateTab" class="tabPanel" hidden>
-    <p class="tabIntro">Type text or a link — get a QR code you can show or share.</p>
-    <textarea id="genInput" class="genInput" rows="3" placeholder="Paste a link, or type anything…"></textarea>
-    <button id="genBtn" class="primaryBtn scanBtn" type="button">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="3" height="3" fill="currentColor"/><rect x="18" y="18" width="3" height="3" fill="currentColor"/></svg>
-      <span>Generate QR</span>
-    </button>
-
-    <div id="genResult" class="genResult" hidden>
-      <div class="qrCanvasWrap"><canvas id="genCanvas"></canvas></div>
-      <div class="genActions">
-        <button id="genShareBtn" class="secondaryBtn" type="button">📤 Share</button>
-        <button id="genDownloadBtn" class="secondaryBtn" type="button">⬇️ Download</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="historyTab" class="tabPanel" hidden>
-    <div class="historyHeader">
-      <p class="tabIntro" style="margin:0;">Everything you've scanned, saved on this device.</p>
-      <button id="clearHistoryBtn" class="clearBtn" type="button">Clear</button>
-    </div>
-    <div id="historyList" class="historyList"></div>
-    <p id="historyEmpty" class="historyEmpty">Nothing scanned yet — your scans will show up here.</p>
-  </div>
-
-</div>
-
-<script>
-  const statusEl = document.getElementById('status');
-  const scanArea = document.getElementById('scanArea');
-  const dashboard = document.getElementById('dashboard');
-  const resultContent = document.getElementById('resultContent');
-  const viewfinderWrap = document.getElementById('viewfinderWrap');
-  const videoEl = document.getElementById('video');
-  const captureCanvas = document.getElementById('captureCanvas');
-  const pingRing = document.getElementById('pingRing');
-  const fileInput = document.getElementById('fileInput');
-  const startCameraBtn = document.getElementById('startCameraBtn');
-  const startBtnLabel = document.getElementById('startBtnLabel');
-  const modeButtons = document.querySelectorAll('.modeBtn');
-  const modeAskSection = document.getElementById('modeAskSection');
-  const retryQrBtn = document.getElementById('retryQrBtn');
-  const retryBarcodeBtn = document.getElementById('retryBarcodeBtn');
-
-  const tabButtons = document.querySelectorAll('.tabBtn');
-  const scanTab = document.getElementById('scanTab');
-  const generateTab = document.getElementById('generateTab');
-  const historyTab = document.getElementById('historyTab');
-  const torchBtn = document.getElementById('torchBtn');
-  const genInput = document.getElementById('genInput');
-  const genBtn = document.getElementById('genBtn');
-  const genResult = document.getElementById('genResult');
-  const genCanvas = document.getElementById('genCanvas');
-  const genShareBtn = document.getElementById('genShareBtn');
-  const genDownloadBtn = document.getElementById('genDownloadBtn');
-  const historyList = document.getElementById('historyList');
-  const historyEmpty = document.getElementById('historyEmpty');
-  const clearHistoryBtn = document.getElementById('clearHistoryBtn');
-
-  let codeReader;
-  let currentMode = 'auto';       // 'auto' | 'qr' | 'barcode'
-  let cameraActive = false;
-  let lastUploadedFile = null;
-
-  // ---------- Format sets per mode ----------
-  function formatsForMode(mode) {
-    const BF = ZXing.BarcodeFormat;
-    if (mode === 'qr') return [BF.QR_CODE];
-    if (mode === 'barcode') {
-      return [BF.EAN_13, BF.EAN_8, BF.UPC_A, BF.UPC_E, BF.CODE_128, BF.CODE_39, BF.ITF, BF.PDF_417, BF.DATA_MATRIX, BF.AZTEC, BF.CODABAR];
-    }
-    return [BF.QR_CODE, BF.EAN_13, BF.EAN_8, BF.UPC_A, BF.UPC_E, BF.CODE_128, BF.CODE_39, BF.ITF, BF.PDF_417, BF.DATA_MATRIX, BF.AZTEC, BF.CODABAR];
-  }
-
-  function buildReader(mode) {
-    const hints = new Map();
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formatsForMode(mode));
-    // TRY_HARDER makes 1D barcode decoding more aggressive, which also makes
-    // it more prone to misreading random pixels as a short garbage code.
-    // Only enable it when the user has confirmed exactly what they're
-    // scanning (QR Only / Barcode Only) — not in Auto mode.
-    if (mode !== 'auto') {
-      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-    }
-    codeReader = new ZXing.BrowserMultiFormatReader(hints);
-  }
-
-  function safeReset() {
-    if (codeReader) {
-      try { codeReader.reset(); } catch (e) { /* ignore */ }
-    }
-    // Also explicitly stop the camera stream — without this, a stale video
-    // track can linger and bleed into the next scan attempt
-    if (videoEl.srcObject) {
-      try { videoEl.srcObject.getTracks().forEach(t => t.stop()); } catch (e) { /* ignore */ }
-      videoEl.srcObject = null;
-    }
-    cameraActive = false;
-    torchBtn.hidden = true;
-    torchBtn.classList.remove('on');
-  }
-
-  // ---------- Torch / flashlight ----------
-  function getVideoTrack() {
-    const stream = videoEl.srcObject;
-    return stream ? stream.getVideoTracks()[0] : null;
-  }
-
-  torchBtn.addEventListener('click', async () => {
-    const track = getVideoTrack();
-    if (!track) return;
-    const isOn = torchBtn.classList.contains('on');
-    try {
-      await track.applyConstraints({ advanced: [{ torch: !isOn }] });
-      torchBtn.classList.toggle('on', !isOn);
-    } catch (e) {
-      statusEl.textContent = "Flashlight isn't supported on this device.";
-    }
-  });
-
-  function checkTorchSupport() {
-    const track = getVideoTrack();
-    if (!track || !track.getCapabilities) { torchBtn.hidden = true; return; }
-    try {
-      const caps = track.getCapabilities();
-      torchBtn.hidden = !caps.torch;
-    } catch (e) {
-      torchBtn.hidden = true;
-    }
-  }
-
-  // ---------- Tabs ----------
-  const tabPanels = { scan: scanTab, generate: generateTab, history: historyTab };
-  tabButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tab = btn.dataset.tab;
-      tabButtons.forEach(b => b.classList.toggle('active', b === btn));
-      Object.entries(tabPanels).forEach(([name, panel]) => {
-        panel.hidden = name !== tab;
-      });
-      // Leaving the scan tab while the camera's running should stop it,
-      // so it's not left running invisibly in the background
-      if (tab !== 'scan' && cameraActive) {
-        safeReset();
-        startCameraBtn.style.display = "block";
-        startCameraBtn.disabled = false;
-        startBtnLabel.textContent = "Scan";
-        scanArea.style.display = "block";
-        viewfinderWrap.classList.remove('scanning');
-      }
-      if (tab === 'history') renderHistory();
-    });
-  });
-
-  // ---------- Scan history (saved on this device only) ----------
-  const HISTORY_KEY = 'universalScannerHistory';
-
-  function loadHistory() {
-    try {
-      return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function saveToHistory(decodedText, link) {
-    try {
-      const history = loadHistory();
-      history.unshift({
-        text: decodedText,
-        type: link ? link.cssClass : 'text',
-        label: link ? link.label : 'Text',
-        time: Date.now()
-      });
-      // Keep this reasonably small so localStorage doesn't grow forever
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 100)));
-    } catch (e) { /* storage full or unavailable — skip saving silently */ }
-  }
-
-  function timeAgo(ts) {
-    const diff = Math.floor((Date.now() - ts) / 1000);
-    if (diff < 60) return "just now";
-    if (diff < 3600) return Math.floor(diff / 60) + "m ago";
-    if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
-    return Math.floor(diff / 86400) + "d ago";
-  }
-
-  function renderHistory() {
-    const history = loadHistory();
-    if (history.length === 0) {
-      historyList.innerHTML = "";
-      historyEmpty.style.display = "block";
-      return;
-    }
-    historyEmpty.style.display = "none";
-    historyList.innerHTML = history.map((item, i) => `
-      <div class="historyItem" data-index="${i}">
-        <div class="historyTop">
-          <span class="historyTypeBadge ${item.type}">${item.label}</span>
-          <span class="historyTime">${timeAgo(item.time)}</span>
-        </div>
-        <div class="historyText">${escapeHtml(item.text)}</div>
-      </div>
-    `).join('');
-
-    historyList.querySelectorAll('.historyItem').forEach(el => {
-      el.addEventListener('click', () => {
-        const item = history[parseInt(el.dataset.index, 10)];
-        if (!item) return;
-        navigator.clipboard.writeText(item.text).then(() => {
-          statusEl.textContent = "";
-          el.style.opacity = "0.6";
-          setTimeout(() => { el.style.opacity = "1"; }, 300);
-        }).catch(() => {});
-      });
-    });
-  }
-
-  clearHistoryBtn.addEventListener('click', () => {
-    localStorage.removeItem(HISTORY_KEY);
-    renderHistory();
-  });
-
-  // ---------- Generate QR ----------
-  function drawGeneratedQr() {
-    const text = genInput.value.trim();
-    if (!text) return;
-    if (typeof QRCode === "undefined") {
-      alert("QR generator library failed to load. Check your internet connection.");
-      return;
-    }
-    QRCode.toCanvas(genCanvas, text, { width: 260, margin: 2 }, (err) => {
-      if (err) return;
-      genResult.hidden = false;
-    });
-  }
-  genBtn.addEventListener('click', drawGeneratedQr);
-
-  genDownloadBtn.addEventListener('click', () => {
-    const link = document.createElement('a');
-    link.download = 'qr-code.png';
-    link.href = genCanvas.toDataURL('image/png');
-    link.click();
-  });
-
-  genShareBtn.addEventListener('click', () => {
-    genCanvas.toBlob(async (blob) => {
-      const file = new File([blob], 'qr-code.png', { type: 'image/png' });
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({ files: [file], title: 'QR Code' });
-        } catch (e) { /* user cancelled — fine */ }
-      } else if (navigator.share) {
-        navigator.share({ text: genInput.value.trim() }).catch(() => {});
-      } else {
-        genDownloadBtn.click();
-      }
-    });
-  });
-
-
-  modeButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      modeButtons.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentMode = btn.dataset.mode;
-      modeAskSection.hidden = true;
-      if (cameraActive) startScanner();
-    });
-  });
-
-  // ---------- Link classification ----------
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-  }
-
-  function classifyLink(text) {
-    const t = text.trim();
-    if (/^upi:\/\//i.test(t)) return { url: t, label: "💳 Click to Pay", cssClass: "pay", appHint: "your UPI app (GPay / PhonePe / Paytm)", externalApp: true };
-    if (/^tel:/i.test(t)) return { url: t, label: "📞 Click to Call", cssClass: "call", appHint: "your dialer", externalApp: true };
-    if (/^mailto:/i.test(t)) return { url: t, label: "📧 Click to Email", cssClass: "mail", appHint: "your email app", externalApp: true };
-    if (/^https?:\/\//i.test(t) || /^www\./i.test(t)) {
-      const url = t.startsWith("http") ? t : "https://" + t;
-      return { url: url, label: "🔗 Click to Open Link", cssClass: "web", appHint: "your browser", externalApp: false };
-    }
-    return null;
-  }
-
-  // ---------- Detection feedback (sound + vibration) ----------
-  // A synthesized chime (not a loaded audio file) so there's zero load delay.
-  // Browsers require audio to start from a real user gesture, so the
-  // AudioContext gets created/resumed when Start Camera is tapped.
-  let audioCtx = null;
-  function ensureAudioReady() {
-    try {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      } else if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
-    } catch (e) { /* Web Audio unsupported — sound just won't play */ }
-  }
-
-  function playFoundSound() {
-    if (!audioCtx) return;
-    const now = audioCtx.currentTime;
-    // Quick two-note upward chime — short and satisfying, not a jingle
-    const notes = [
-      { freq: 1046.5, start: 0,    dur: 0.11 },
-      { freq: 1568.0, start: 0.09, dur: 0.18 }
-    ];
-    notes.forEach(n => {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = n.freq;
-      gain.gain.setValueAtTime(0.0001, now + n.start);
-      gain.gain.exponentialRampToValueAtTime(0.22, now + n.start + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + n.start + n.dur);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start(now + n.start);
-      osc.stop(now + n.start + n.dur + 0.02);
-    });
-  }
-
-  function playFoundHaptic() {
-    try {
-      if (navigator.vibrate) navigator.vibrate([15, 30, 40]);
-    } catch (e) { /* vibration unsupported on this device/browser */ }
-  }
-
-  function playFoundFeedback() {
-    playFoundSound();
-    playFoundHaptic();
-  }
-
-  // ---------- Handling a successful scan ----------
-  // "Lock-on" effect — freezes the camera frame at the moment of detection,
-  // drops a ping right on the code's exact position, then zooms the frozen
-  // frame outward from that spot (like the code is flying toward you)
-  // before revealing the result. Falls back to a simpler flash if we don't
-  // have a usable position (e.g. some barcode formats only give 2 points).
-  function playLockOnEffect(decodedText, points) {
-    const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
-    if (!vw || !vh || !points || points.length < 2) {
-      onScanSuccess(decodedText, true);
-      return;
-    }
-
-    // Capture the current frame before the camera stream gets stopped
-    captureCanvas.width = vw;
-    captureCanvas.height = vh;
-    const ctx = captureCanvas.getContext('2d');
-    ctx.drawImage(videoEl, 0, 0, vw, vh);
-
-    // Bounding box of the detected code, in native video pixel coordinates
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    points.forEach(p => {
-      const x = p.getX ? p.getX() : p.x;
-      const y = p.getY ? p.getY() : p.y;
-      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
-    });
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-
-    // Map that native-pixel point to where it actually appears on screen —
-    // the video is shown with object-fit: cover, which crops/scales it
-    const dispW = viewfinderWrap.clientWidth, dispH = viewfinderWrap.clientHeight;
-    const coverScale = Math.max(dispW / vw, dispH / vh);
-    const offsetX = (vw * coverScale - dispW) / 2;
-    const offsetY = (vh * coverScale - dispH) / 2;
-    const dispX = centerX * coverScale - offsetX;
-    const dispY = centerY * coverScale - offsetY;
-    const originXPct = Math.min(100, Math.max(0, (dispX / dispW) * 100));
-    const originYPct = Math.min(100, Math.max(0, (dispY / dispH) * 100));
-
-    safeReset();
-    playFoundFeedback();
-    viewfinderWrap.classList.remove('scanning');
-    modeAskSection.hidden = true;
-    statusEl.textContent = "✅ Code found";
-
-    // Ping marks the exact spot the code was found
-    pingRing.style.left = `${dispX}px`;
-    pingRing.style.top = `${dispY}px`;
-    pingRing.classList.remove('pinging');
-    void pingRing.offsetWidth;
-    pingRing.classList.add('pinging');
-
-    // The frozen frame zooms outward from that same spot
-    captureCanvas.style.transformOrigin = `${originXPct}% ${originYPct}%`;
-    captureCanvas.classList.remove('zooming');
-    void captureCanvas.offsetWidth;
-    captureCanvas.classList.add('zooming');
-
-    setTimeout(() => {
-      captureCanvas.classList.remove('zooming');
-      pingRing.classList.remove('pinging');
-      scanArea.classList.add('flipOut');
-      setTimeout(() => {
-        scanArea.style.display = "none";
-        scanArea.classList.remove('flipOut');
-        revealResult(decodedText);
-      }, 400);
-    }, 600);
-  }
-
-  function onScanSuccess(decodedText, fromCamera = true) {
-    safeReset();
-    modeAskSection.hidden = true;
-
-    if (fromCamera) {
-      // Freeze the laser, flash the corner brackets, and pop a checkmark —
-      // a clear "locked on" moment instead of the view just vanishing
-      playFoundFeedback();
-      viewfinderWrap.classList.remove('scanning');
-      viewfinderWrap.classList.add('detected');
-      statusEl.textContent = "✅ Code found";
-    } else {
-      statusEl.textContent = "✅ Code found";
-    }
-
-    setTimeout(() => {
-      viewfinderWrap.classList.remove('detected');
-      scanArea.classList.add('flipOut');
-      setTimeout(() => {
-        scanArea.style.display = "none";
-        scanArea.classList.remove('flipOut');
-        revealResult(decodedText);
-      }, 400);
-    }, fromCamera ? 480 : 260);
-  }
-
-  function revealResult(decodedText) {
-    const link = classifyLink(decodedText);
-
-    const glowColors = {
-      pay: "rgba(22,163,74,0.4)",
-      web: "rgba(37,99,235,0.4)",
-      call: "rgba(217,119,6,0.4)",
-      mail: "rgba(124,92,255,0.4)"
-    };
-    dashboard.style.setProperty(
-      '--ticket-glow',
-      link ? (glowColors[link.cssClass] || "rgba(0,217,163,0.35)") : "rgba(0,217,163,0.35)"
-    );
-
-    if (link) {
-      const targetAttr = link.externalApp ? "" : ` target="_blank" rel="noopener"`;
-      const badge = link.cssClass === "pay"
-        ? `<div class="verifyBadge"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#2563eb"/><path d="M7.5 12.5L10.5 15.5L16.5 9" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>UPI Payment Code Detected</div>`
-        : "";
-      resultContent.innerHTML =
-        badge +
-        `<a class="actionBtn ${link.cssClass}" href="${escapeHtml(link.url)}"${targetAttr}>${link.label}</a>` +
-        `<button class="copyBtn" id="copyBtn" type="button">📋 Copy Link</button>` +
-        `<p class="hintText">If tapping doesn't open anything, copy the link and paste it into ${link.appHint}.</p>` +
-        `<div class="rawLink">${escapeHtml(decodedText)}</div>`;
-
-      const copyBtn = document.getElementById('copyBtn');
-      copyBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(link.url).then(() => {
-          copyBtn.textContent = "✅ Copied!";
-          setTimeout(() => { copyBtn.textContent = "📋 Copy Link"; }, 1500);
-        }).catch(() => {
-          copyBtn.textContent = "Couldn't copy";
-        });
-      });
-    } else {
-      resultContent.innerHTML = `<pre>${escapeHtml(decodedText)}</pre>`;
-    }
-
-    dashboard.hidden = false;
-    // Retrigger the flip-in animation even if the ticket was already shown before
-    dashboard.classList.remove('flipIn');
-    void dashboard.offsetWidth;
-    dashboard.classList.add('flipIn');
-  }
-
-  // ---------- Live camera ----------
-  async function startScanner() {
-    if (typeof ZXing === "undefined") {
-      statusEl.textContent = "Scanner library failed to load. Check your internet connection and reload.";
-      return;
-    }
-
-    safeReset();
-    buildReader(currentMode);
-
-    dashboard.hidden = true;
-    scanArea.style.display = "block";
-    scanArea.classList.remove('flipOut');
-    captureCanvas.classList.remove('zooming');
-    pingRing.classList.remove('pinging');
-    startCameraBtn.disabled = true;
-    startBtnLabel.textContent = "Starting…";
-    statusEl.textContent = "Requesting camera access…";
-    fileInput.value = "";
-
-    let startTimedOut = false;
-    const startTimeout = setTimeout(() => {
-      startTimedOut = true;
-      startCameraBtn.disabled = false;
-      startBtnLabel.textContent = "Scan";
-      statusEl.textContent = "Camera is taking too long to start. Try again, or use Upload below.";
-    }, 12000);
-
-    try {
-      await codeReader.decodeFromConstraints(
-        { video: { facingMode: "environment" } },
-        videoEl,
-        (result, err) => {
-          if (result) {
-            const fmt = result.getBarcodeFormat ? result.getBarcodeFormat() : null;
-            const text = result.getText();
-            // In Auto mode, 1D barcode decoders occasionally misread random
-            // pixels as a short garbage code (e.g. "BOB"). Real barcodes are
-            // essentially never this short, so ignore these and keep scanning.
-            if (currentMode === 'auto' && fmt !== ZXing.BarcodeFormat.QR_CODE && text.trim().length < 5) {
-              return;
-            }
-            const points = (result.getResultPoints && result.getResultPoints()) || [];
-            playLockOnEffect(text, points);
-          }
-          // err fires on every frame where nothing is found yet — that's normal, ignore it
-        }
-      );
-      clearTimeout(startTimeout);
-      if (startTimedOut) {
-        safeReset();
-        return;
-      }
-      cameraActive = true;
-      startCameraBtn.style.display = "none";
-      viewfinderWrap.classList.add('scanning');
-      statusEl.textContent = "Point your camera at a QR code or barcode…";
-    } catch (err) {
-      clearTimeout(startTimeout);
-      startCameraBtn.disabled = false;
-      startBtnLabel.textContent = "Scan";
-      statusEl.textContent = "Camera access failed: " + err + " — check permissions, or use Upload below.";
-    }
-  }
-
-  startCameraBtn.addEventListener('click', () => { ensureAudioReady(); startScanner(); });
-  document.getElementById('scanAgainBtn').addEventListener('click', () => {
-    startCameraBtn.style.display = "block";
-    startCameraBtn.disabled = false;
-    startBtnLabel.textContent = "Scan";
-    startScanner();
-  });
-
-  // ---------- Upload a photo ----------
-  // Redraws the image at a specific size. ZXing (the JS decoder) often
-  // struggles with very large, high-resolution photos — especially ones with
-  // a logo in the center, like most UPI QR codes — so trying a few different
-  // sizes (including smaller ones) gives it a much better shot than only
-  // ever trying the original photo.
-  function resizeImage(file, targetLongSide) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        const longSide = Math.max(img.width, img.height);
-        const factor = targetLongSide / longSide;
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, Math.round(img.width * factor));
-        canvas.height = Math.max(1, Math.round(img.height * factor));
-        const ctx = canvas.getContext('2d');
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        URL.revokeObjectURL(url);
-        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("canvas export failed")), 'image/png', 1);
-      };
-      img.onerror = reject;
-      img.src = url;
-    });
-  }
-
-  async function scanUploadedFile(file, mode) {
-    if (typeof ZXing === "undefined") {
-      statusEl.textContent = "Scanner library failed to load. Check your internet connection and reload.";
-      return;
-    }
-
-    modeAskSection.hidden = true;
-    scanArea.style.display = "block";
-    dashboard.hidden = true;
-    statusEl.textContent = "Scanning uploaded photo…";
-
-    safeReset();
-    buildReader(mode);
-
-    // Try the original photo first, then a range of resized versions —
-    // large photos (especially with a logo in the middle) often decode
-    // better once scaled down, not just up
-    const attempts = [null, 1000, 700, 450, 1600];
-
-    for (const targetSize of attempts) {
-      let blob;
-      try {
-        blob = targetSize === null ? file : await resizeImage(file, targetSize);
-      } catch (e) {
-        continue;
-      }
-      const url = URL.createObjectURL(blob);
-      try {
-        const result = await codeReader.decodeFromImageUrl(url);
-        URL.revokeObjectURL(url);
-        onScanSuccess(result.getText(), false);
-        return;
-      } catch (err) {
-        URL.revokeObjectURL(url);
-        // try the next size
-      }
-    }
-
-    if (mode === 'auto') {
-      statusEl.textContent = "Couldn't automatically detect a code in that photo.";
-      modeAskSection.hidden = false;
-    } else {
-      statusEl.textContent = "Couldn't find a " + (mode === 'qr' ? "QR code" : "barcode") + " in that photo. Try a clearer, closer, well-lit shot.";
-    }
-  }
-
-  fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    lastUploadedFile = file;
-    scanUploadedFile(file, currentMode);
-  });
-
-  retryQrBtn.addEventListener('click', () => {
-    if (lastUploadedFile) scanUploadedFile(lastUploadedFile, 'qr');
-  });
-  retryBarcodeBtn.addEventListener('click', () => {
-    if (lastUploadedFile) scanUploadedFile(lastUploadedFile, 'barcode');
-  });
-
-  // No auto-start — browsers (especially mobile Safari) require a real user
-  // tap before they'll show the camera permission prompt.
-
-  // Register the service worker so the browser offers "Add to Home Screen" /
-  // "Install app". This has no effect on scanning itself.
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('service-worker.js').catch(() => { /* ignore */ });
-    });
-  }
-</script>
-
-</body>
-</html>
+  <!-- Dynamic Balance Header Component -->
+  <div class="stats-header">
+    <span style="font-size: 13px; color: var(--text-mid);">Theme Equipped: <b id="currentSkinText" style="color: #fff;">GREEN FLASH</b></span>
+    <div class="coin-badge">
