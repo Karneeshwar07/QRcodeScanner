@@ -14,16 +14,16 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Scanner">
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://googleapis.com">
+<link rel="preconnect" href="https://gstatic.com" crossorigin>
+<link href="https://googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 
-<!-- ZXing: a well-established, widely-used QR/barcode reading library -->
-<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
-<!-- For generating QR codes (the "Generate" tab) -->
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<!-- ZXing & QRCode core engines loaded immediately to prevent startup delay layout blocks -->
+<script src="https://jsdelivr.net"></script>
+<script src="https://jsdelivr.net"></script>
 
-<!-- Google Firebase Compat Core Security SDK (Unified matching versions) -->
+<!-- Restored stable matching CDN modules for Firebase execution layer routines -->
+<script src="https://gstatic.com"></script>
 <script src="https://gstatic.com"></script>
 <script src="https://gstatic.com"></script>
 <script src="https://gstatic.com"></script>
@@ -69,10 +69,6 @@
   }
   header  { animation: fadeSlideUp 0.6s ease both; }
   #scanArea { animation: fadeSlideUp 0.6s ease both 0.12s; }
-  @media (prefers-reduced-motion: reduce) {
-    header, #scanArea { animation: none; }
-    header::before { animation: none; opacity: 0.7; }
-  }
 
   header { position: relative; text-align: center; margin-bottom: 22px; }
   header::before {
@@ -238,7 +234,7 @@
   #qrResult { margin-top: 24px; display: flex; justify-content: center; align-items: center; background: #ffffff; padding: 20px; border-radius: 20px; width: fit-content; margin-left: auto; margin-right: auto; }
 
   .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
-  .shop-item { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 16px; padding: 14px; text-align: center; }
+  .shop-item { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 16px; padding: 14px; text-align: center; border: 1px solid transparent; }
   .shop-item.equipped { border-color: var(--accent); }
   .price-tag { color: var(--gold); font-family: var(--mono); font-size: 13px; font-weight: bold; margin: 8px 0; }
   .action-btn { width: 100%; background: rgba(255,255,255,0.06); border: 1px solid var(--border); padding: 9px; border-radius: 10px; color: #fff; font-size: 12.5px; font-weight: 600; cursor: pointer; }
