@@ -1,351 +1,621 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>3D QR Scanner - Hold then Disintegrate</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-    body {
-      background: #0f111a;
-      color: #fff;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      overflow: hidden;
-    }
-
-    #canvas-container {
-      position: relative;
-      width: 400px;
-      height: 400px;
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    #three-canvas {
-      width: 100%;
-      height: 100%;
-      display: block;
-    }
-
-    .controls {
-      margin-top: 24px;
-      display: flex;
-      gap: 12px;
-    }
-
-    button {
-      background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-      border: none;
-      color: #fff;
-      padding: 12px 24px;
-      font-size: 15px;
-      font-weight: 600;
-      border-radius: 30px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
-    }
-
-    button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(79, 172, 254, 0.6);
-    }
-
-    #status-text {
-      margin-top: 16px;
-      font-size: 14px;
-      color: #a0aec0;
-      letter-spacing: 0.5px;
-    }
-  </style>
-
-  <!-- Load Three.js Library -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-</head>
-<body>
-
-  <div id="canvas-container">
-    <canvas id="three-canvas"></canvas>
-  </div>
-
-  <div class="controls">
-    <button onclick="triggerScanAnimation()">Trigger Scan Detection</button>
-  </div>
-
-  <p id="status-text">Status: Ready to scan</p>
-
-  <script>
-    // --- 1. SETUP THREE.JS SCENE ---
-    const container = document.getElementById('canvas-container');
-    const statusText = document.getElementById('status-text');
-
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x0f111a, 0.05);
-
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
-    camera.position.set(0, 0, 7);
-
-    const renderer = new THREE.WebGLRenderer({
-      canvas: document.getElementById('three-canvas'),
-      antialias: true,
-      alpha: true
-    });
-    renderer.setSize(400, 400);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-    // --- 2. LIGHTING & 3D WHITE FRAME ---
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-    scene.add(ambientLight);
-
-    const pointLight = new THREE.PointLight(0xffffff, 1.2);
-    pointLight.position.set(5, 5, 5);
-    scene.add(pointLight);
-
-    // Create White 3D Frame Box
-    const frameGroup = new THREE.Group();
-    const frameMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.2,
-      metalness: 0.1
-    });
-
-    // Outer Border Lines / Corner Brackets
-    const boxGeo = new THREE.BoxGeometry(3.2, 3.2, 0.2);
-    const boxEdges = new THREE.EdgesGeometry(boxGeo);
-    const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 });
-    const wireframeBox = new THREE.LineSegments(boxEdges, lineMat);
-    frameGroup.add(wireframeBox);
-
-    // Subtle White Backdrop Inside 3D Container
-    const bgGeo = new THREE.PlaneGeometry(3, 3);
-    const bgMat = new THREE.MeshBasicMaterial({ color: 0x1a1d2e, side: THREE.DoubleSide });
-    const bgMesh = new THREE.Mesh(bgGeo, bgMat);
-    bgMesh.position.z = -0.05;
-    frameGroup.add(bgMesh);
-
-    scene.add(frameGroup);
-
-    // --- 3. GENERATE DUMMY QR CODE TEXTURE ---
-    function createQRTexture() {
-      const canvas = document.createElement('canvas');
-      canvas.width = 256;
-      canvas.height = 256;
-      const ctx = canvas.getContext('2d');
-
-      // Draw Background
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, 256, 256);
-
-      // Draw Dummy QR Pattern
-      ctx.fillStyle = '#000000';
-      const gridSize = 16;
-      const cellSize = 256 / gridSize;
-
-      for (let r = 0; r < gridSize; r++) {
-        for (let c = 0; c < gridSize; c++) {
-          // Position markers at corners
-          const isCorner = (r < 4 && c < 4) || (r < 4 && c > 11) || (r > 11 && c < 4);
-          if (isCorner || Math.random() > 0.5) {
-            ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
-          }
-        }
-      }
-
-      return new THREE.CanvasTexture(canvas);
-    }
-
-    const qrTexture = createQRTexture();
-
-    // Solid QR Plane inside the 3D Box
-    const qrPlaneGeo = new THREE.PlaneGeometry(2.8, 2.8);
-    const qrPlaneMat = new THREE.MeshBasicMaterial({
-      map: qrTexture,
-      transparent: true,
-      opacity: 0 // Hidden initially
-    });
-    const qrMesh = new THREE.Mesh(qrPlaneGeo, qrPlaneMat);
-    qrMesh.position.z = 0.01;
-    scene.add(qrMesh);
-
-    // --- 4. PARTICLE SYSTEM FOR DISINTEGRATION EFFECT ---
-    const PARTICLE_COUNT = 1600; // 40x40 Grid
-    const particleGeo = new THREE.BufferGeometry();
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D QR & Barcode Scanner</title>
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    const positions = new Float32Array(PARTICLE_COUNT * 3);
-    const velocities = new Float32Array(PARTICLE_COUNT * 3);
-    const uvs = new Float32Array(PARTICLE_COUNT * 2);
-    const alphas = new Float32Array(PARTICLE_COUNT);
-
-    // Build particle initial coordinates matching QR plane geometry
-    let pIndex = 0;
-    const gridRes = 40;
-    const step = 2.8 / gridRes;
-
-    for (let i = 0; i < gridRes; i++) {
-      for (let j = 0; j < gridRes; j++) {
-        const x = -1.4 + j * step + step / 2;
-        const y = 1.4 - i * step - step / 2;
-
-        positions[pIndex * 3] = x;
-        positions[pIndex * 3 + 1] = y;
-        positions[pIndex * 3 + 2] = 0.01;
-
-        // Spread velocities (moving outward toward the viewer)
-        velocities[pIndex * 3] = (Math.random() - 0.5) * 0.04;
-        velocities[pIndex * 3 + 1] = (Math.random() - 0.5) * 0.04;
-        velocities[pIndex * 3 + 2] = Math.random() * 0.06 + 0.02; // Moving toward screen
-
-        uvs[pIndex * 2] = j / gridRes;
-        uvs[pIndex * 2 + 1] = 1.0 - (i / gridRes);
-
-        alphas[pIndex] = 0.0; // Initially hidden
-
-        pIndex++;
-      }
-    }
-
-    particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    particleGeo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-    particleGeo.setAttribute('alpha', new THREE.BufferAttribute(alphas, 1));
-
-    // Custom Shader Material to sample QR texture onto moving particles
-    const particleMaterial = new THREE.ShaderMaterial({
-      uniforms: {
-        uTexture: { value: qrTexture }
-      },
-      vertexShader: `
-        attribute float alpha;
-        varying vec2 vUv;
-        varying float vAlpha;
-        void main() {
-          vUv = uv;
-          vAlpha = alpha;
-          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          gl_PointSize = (12.0 / -mvPosition.z); // Scale size with distance
-          gl_Position = projectionMatrix * mvPosition;
+    <!-- Dependencies -->
+    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/@zxing/library@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <style>
+        :root {
+            --bg-primary: #0a0c10;
+            --bg-secondary: #12151e;
+            --accent-glow: #00f2fe;
+            --accent-secondary: #4facfe;
+            --text-main: #f0f4f8;
+            --text-sub: #8a99ad;
+            --card-bg: rgba(18, 21, 30, 0.75);
+            --card-border: rgba(255, 255, 255, 0.08);
         }
-      `,
-      fragmentShader: `
-        uniform sampler2D uTexture;
-        varying vec2 vUv;
-        varying float vAlpha;
-        void main() {
-          vec4 texColor = texture2D(uTexture, vUv);
-          gl_FragColor = vec4(texColor.rgb, texColor.a * vAlpha);
+
+        [data-theme="light"] {
+            --bg-primary: #f4f7f6;
+            --bg-secondary: #ffffff;
+            --accent-glow: #0080ff;
+            --accent-secondary: #00d2ff;
+            --text-main: #1a202c;
+            --text-sub: #718096;
+            --card-bg: rgba(255, 255, 255, 0.85);
+            --card-border: rgba(0, 0, 0, 0.08);
         }
-      `,
-      transparent: true,
-      depthWrite: false
-    });
 
-    const particlePoints = new THREE.Points(particleGeo, particleMaterial);
-    scene.add(particlePoints);
-
-    // --- 5. ANIMATION LOGIC & SEQUENCING ---
-    let isExploding = false;
-    let holdDuration = 800; // Pause duration in ms to see static QR in 3D frame
-
-    function triggerScanAnimation() {
-      // Step 1: Lock and Display the static QR code in the 3D frame
-      statusText.innerText = "Status: QR Detected! Lock inside 3D frame...";
-      qrMesh.material.opacity = 1.0;
-      isExploding = false;
-
-      // Reset particle positions & hidden state
-      resetParticles();
-
-      // Step 2: Hold state, then trigger piece disintegration
-      setTimeout(() => {
-        statusText.innerText = "Status: Disintegrating into particle pieces...";
-        qrMesh.material.opacity = 0.0; // Hide static QR plane
-        showParticles();
-        isExploding = true;
-      }, holdDuration);
-    }
-
-    function resetParticles() {
-      const posAttr = particleGeo.attributes.position;
-      const alphaAttr = particleGeo.attributes.alpha;
-      
-      let pIdx = 0;
-      for (let i = 0; i < gridRes; i++) {
-        for (let j = 0; j < gridRes; j++) {
-          posAttr.setXYZ(pIdx, -1.4 + j * step + step / 2, 1.4 - i * step - step / 2, 0.01);
-          alphaAttr.setX(pIdx, 0.0);
-          pIdx++;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
         }
-      }
-      posAttr.needsUpdate = true;
-      alphaAttr.needsUpdate = true;
-    }
 
-    function showParticles() {
-      const alphaAttr = particleGeo.attributes.alpha;
-      for (let i = 0; i < PARTICLE_COUNT; i++) {
-        alphaAttr.setX(i, 1.0);
-      }
-      alphaAttr.needsUpdate = true;
-    }
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
 
-    // --- 6. RENDER LOOP ---
-    function animate() {
-      requestAnimationFrame(animate);
+        header {
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--card-border);
+            z-index: 10;
+        }
 
-      // Subtle 3D floating animation for frame
-      frameGroup.rotation.y = Math.sin(Date.now() * 0.001) * 0.1;
-      frameGroup.rotation.x = Math.cos(Date.now() * 0.001) * 0.05;
-      qrMesh.rotation.copy(frameGroup.rotation);
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1.25rem;
+            background: linear-gradient(135deg, var(--accent-glow), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
 
-      // Animate particle fragmentation
-      if (isExploding) {
-        const posAttr = particleGeo.attributes.position;
-        const alphaAttr = particleGeo.attributes.alpha;
+        .nav-actions {
+            display: flex;
+            gap: 12px;
+        }
 
-        let activeCount = 0;
+        .icon-btn {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            color: var(--text-main);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
 
-        for (let i = 0; i < PARTICLE_COUNT; i++) {
-          let currentAlpha = alphaAttr.getX(i);
+        .icon-btn:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-glow);
+        }
 
-          if (currentAlpha > 0) {
-            activeCount++;
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            background: var(--card-bg);
+            padding: 6px;
+            border-radius: 30px;
+            border: 1px solid var(--card-border);
+            margin-bottom: 2rem;
+        }
+
+        .tab-btn {
+            padding: 8px 20px;
+            border-radius: 20px;
+            border: none;
+            background: transparent;
+            color: var(--text-sub);
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, var(--accent-glow), var(--accent-secondary));
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(0, 242, 254, 0.3);
+        }
+
+        .view-panel {
+            display: none;
+            width: 100%;
+            max-width: 500px;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .view-panel.active {
+            display: flex;
+        }
+
+        /* 3D Stage Container */
+        .scanner-container {
+            position: relative;
+            width: 340px;
+            height: 340px;
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            border: 1px solid var(--card-border);
+            background: #000;
+        }
+
+        #webcam {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        #three-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .scanner-controls {
+            margin-top: 1.5rem;
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 12px;
+            border: 1px solid var(--card-border);
+            background: var(--card-bg);
+            color: var(--text-main);
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-glow), var(--accent-secondary));
+            color: #fff;
+            border: none;
+        }
+
+        /* Result Modal */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 2rem;
+            width: 90%;
+            max-width: 420px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .result-box {
+            background: var(--bg-primary);
+            padding: 1rem;
+            border-radius: 12px;
+            word-break: break-all;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--card-border);
+            color: var(--accent-glow);
+        }
+
+        .history-list {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .history-item {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            padding: 12px 16px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+    </style>
+</head>
+<body data-theme="dark">
+
+    <header>
+        <div class="logo">
+            <i class="fa-solid fa-qrcode"></i>
+            <span>3D ScanVerse</span>
+        </div>
+        <div class="nav-actions">
+            <button class="icon-btn" id="theme-toggle" onclick="toggleTheme()">
+                <i class="fa-solid fa-moon"></i>
+            </button>
+        </div>
+    </header>
+
+    <main>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('scanner')">Scanner</button>
+            <button class="tab-btn" onclick="switchTab('generator')">Generator</button>
+            <button class="tab-btn" onclick="switchTab('history')">History</button>
+        </div>
+
+        <!-- SCANNER VIEW -->
+        <div id="scanner-view" class="view-panel active">
+            <div class="scanner-container">
+                <video id="webcam" playsinline></video>
+                <canvas id="three-canvas"></canvas>
+            </div>
+            <div class="scanner-controls">
+                <button class="btn" onclick="toggleTorch()"><i class="fa-solid fa-bolt"></i> Flash</button>
+                <button class="btn" onclick="switchCamera()"><i class="fa-solid fa-camera-rotate"></i> Flip</button>
+            </div>
+        </div>
+
+        <!-- GENERATOR VIEW -->
+        <div id="generator-view" class="view-panel">
+            <input type="text" id="qr-input" placeholder="Enter URL or Text..." style="width:100%; padding:12px; border-radius:12px; border:1px solid var(--card-border); background:var(--card-bg); color:var(--text-main); margin-bottom:1rem;">
+            <button class="btn btn-primary" onclick="generateQR()">Generate Code</button>
+            <div id="qrcode-output" style="margin-top: 1.5rem;"></div>
+        </div>
+
+        <!-- HISTORY VIEW -->
+        <div id="history-view" class="view-panel">
+            <div class="history-list" id="history-container">
+                <p style="color:var(--text-sub); text-align:center;">No history recorded yet.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- RESULT MODAL -->
+    <div class="modal" id="result-modal">
+        <div class="modal-card">
+            <h3 class="modal-title" id="modal-type-title">Scan Result</h3>
+            <div class="result-box" id="result-text"></div>
+            <div style="display:flex; gap:10px; justify-content:center;">
+                <button class="btn btn-primary" onclick="openResultLink()">Open Link / Pay</button>
+                <button class="btn" onclick="closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- APPLICATION STATE ---
+        let currentStream = null;
+        let codeReader = null;
+        let activeCameraId = null;
+        let isTorchOn = false;
+        let historyData = [];
+
+        // --- THREE.JS SCENE SETUP ---
+        const canvas = document.getElementById('three-canvas');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+        camera.position.z = 7;
+
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+        renderer.setSize(340, 340);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        // 3D White Target Frame Box
+        const frameGroup = new THREE.Group();
+        const boxGeo = new THREE.BoxGeometry(3.2, 3.2, 0.15);
+        const boxEdges = new THREE.EdgesGeometry(boxGeo);
+        const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 });
+        const wireframeBox = new THREE.LineSegments(boxEdges, lineMat);
+        frameGroup.add(wireframeBox);
+
+        scene.add(frameGroup);
+
+        // Dynamic QR Image Texture Mesh
+        const qrPlaneGeo = new THREE.PlaneGeometry(2.8, 2.8);
+        const qrPlaneMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
+        const qrMesh = new THREE.Mesh(qrPlaneGeo, qrPlaneMat);
+        qrMesh.position.z = 0.01;
+        scene.add(qrMesh);
+
+        // Particle Disintegration System
+        const PARTICLE_COUNT = 1600;
+        const particleGeo = new THREE.BufferGeometry();
+        const positions = new Float32Array(PARTICLE_COUNT * 3);
+        const velocities = new Float32Array(PARTICLE_COUNT * 3);
+        const uvs = new Float32Array(PARTICLE_COUNT * 2);
+        const alphas = new Float32Array(PARTICLE_COUNT);
+
+        let pIndex = 0;
+        const gridRes = 40;
+        const step = 2.8 / gridRes;
+
+        for (let i = 0; i < gridRes; i++) {
+            for (let j = 0; j < gridRes; j++) {
+                positions[pIndex * 3] = -1.4 + j * step + step / 2;
+                positions[pIndex * 3 + 1] = 1.4 - i * step - step / 2;
+                positions[pIndex * 3 + 2] = 0.01;
+
+                velocities[pIndex * 3] = (Math.random() - 0.5) * 0.05;
+                velocities[pIndex * 3 + 1] = (Math.random() - 0.5) * 0.05;
+                velocities[pIndex * 3 + 2] = Math.random() * 0.08 + 0.03;
+
+                uvs[pIndex * 2] = j / gridRes;
+                uvs[pIndex * 2 + 1] = 1.0 - (i / gridRes);
+                alphas[pIndex] = 0.0;
+                pIndex++;
+            }
+        }
+
+        particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        particleGeo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+        particleGeo.setAttribute('alpha', new THREE.BufferAttribute(alphas, 1));
+
+        const particleMaterial = new THREE.ShaderMaterial({
+            uniforms: { uTexture: { value: null } },
+            vertexShader: `
+                attribute float alpha;
+                varying vec2 vUv;
+                varying float vAlpha;
+                void main() {
+                    vUv = uv;
+                    vAlpha = alpha;
+                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                    gl_PointSize = (14.0 / -mvPosition.z);
+                    gl_Position = projectionMatrix * mvPosition;
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D uTexture;
+                varying vec2 vUv;
+                varying float vAlpha;
+                void main() {
+                    vec4 texColor = texture2D(uTexture, vUv);
+                    gl_FragColor = vec4(texColor.rgb, texColor.a * vAlpha);
+                }
+            `,
+            transparent: true,
+            depthWrite: false
+        });
+
+        const particlePoints = new THREE.Points(particleGeo, particleMaterial);
+        scene.add(particlePoints);
+
+        let isExploding = false;
+
+        // --- SCAN DETECTION & 3D ANIMATION LOGIC ---
+        function handleScanSuccess(resultText) {
+            // 1. Capture current video frame as texture
+            const video = document.getElementById('webcam');
+            const captureCanvas = document.createElement('canvas');
+            captureCanvas.width = 256;
+            captureCanvas.height = 256;
+            const ctx = captureCanvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, 256, 256);
+
+            const frameTexture = new THREE.CanvasTexture(captureCanvas);
+            qrMesh.material.map = frameTexture;
+            qrMesh.material.needsUpdate = true;
+            particleMaterial.uniforms.uTexture.value = frameTexture;
+
+            // 2. Lock & Hold static QR code inside white 3D frame
+            qrMesh.material.opacity = 1.0;
+            isExploding = false;
+            resetParticles();
+
+            // 3. Pause briefly (600ms) so QR code is visible before shattering into pieces
+            setTimeout(() => {
+                qrMesh.material.opacity = 0.0;
+                showParticles();
+                isExploding = true;
+
+                // 4. Show Modal Result after particle breakdown completes
+                setTimeout(() => {
+                    processScanResult(resultText);
+                }, 800);
+            }, 600);
+        }
+
+        function resetParticles() {
+            const posAttr = particleGeo.attributes.position;
+            const alphaAttr = particleGeo.attributes.alpha;
+            let pIdx = 0;
+            for (let i = 0; i < gridRes; i++) {
+                for (let j = 0; j < gridRes; j++) {
+                    posAttr.setXYZ(pIdx, -1.4 + j * step + step / 2, 1.4 - i * step - step / 2, 0.01);
+                    alphaAttr.setX(pIdx, 0.0);
+                    pIdx++;
+                }
+            }
+            posAttr.needsUpdate = true;
+            alphaAttr.needsUpdate = true;
+        }
+
+        function showParticles() {
+            const alphaAttr = particleGeo.attributes.alpha;
+            for (let i = 0; i < PARTICLE_COUNT; i++) alphaAttr.setX(i, 1.0);
+            alphaAttr.needsUpdate = true;
+        }
+
+        // Animation Render Loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            frameGroup.rotation.y = Math.sin(Date.now() * 0.001) * 0.1;
+            frameGroup.rotation.x = Math.cos(Date.now() * 0.001) * 0.05;
+            qrMesh.rotation.copy(frameGroup.rotation);
+
+            if (isExploding) {
+                const posAttr = particleGeo.attributes.position;
+                const alphaAttr = particleGeo.attributes.alpha;
+
+                for (let i = 0; i < PARTICLE_COUNT; i++) {
+                    let currentAlpha = alphaAttr.getX(i);
+                    if (currentAlpha > 0) {
+                        let x = posAttr.getX(i) + velocities[i * 3];
+                        let y = posAttr.getY(i) + velocities[i * 3 + 1];
+                        let z = posAttr.getZ(i) + velocities[i * 3 + 2];
+                        currentAlpha -= 0.015;
+
+                        posAttr.setXYZ(i, x, y, z);
+                        alphaAttr.setX(i, Math.max(0, currentAlpha));
+                    }
+                }
+                posAttr.needsUpdate = true;
+                alphaAttr.needsUpdate = true;
+            }
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // --- CAMERA & SCANNER ENGINE ---
+        async function initScanner() {
+            codeReader = new ZXing.BrowserMultiFormatReader();
+            try {
+                const videoInputDevices = await codeReader.listVideoInputDevices();
+                if (videoInputDevices.length > 0) {
+                    activeCameraId = videoInputDevices[0].deviceId;
+                    startScanning(activeCameraId);
+                }
+            } catch (err) {
+                console.error("Camera init error:", err);
+            }
+        }
+
+        function startScanning(deviceId) {
+            codeReader.decodeFromVideoDevice(deviceId, 'webcam', (result, err) => {
+                if (result && !isExploding && qrMesh.material.opacity === 0) {
+                    handleScanSuccess(result.getText());
+                }
+            });
+        }
+
+        // --- PAYMENT & RESULT HANDLING ---
+        function processScanResult(text) {
+            const modal = document.getElementById('result-modal');
+            const resultBox = document.getElementById('result-text');
+            const titleBox = document.getElementById('modal-type-title');
+
+            resultBox.innerText = text;
+
+            // Detect payment UPI or Web URLs safely
+            if (text.startsWith('upi://') || text.includes('pay')) {
+                titleBox.innerText = "Payment QR Detected";
+            } else if (text.startsWith('http://') || text.startsWith('https://')) {
+                titleBox.innerText = "Web Link Detected";
+            } else {
+                titleBox.innerText = "Scan Result";
+            }
+
+            // Save to history list
+            historyData.unshift({ text, date: new Date().toLocaleTimeString() });
+            renderHistory();
+
+            modal.classList.add('active');
+        }
+
+        function openResultLink() {
+            const text = document.getElementById('result-text').innerText;
+            if (text.startsWith('http://') || text.startsWith('https://') || text.startsWith('upi://')) {
+                window.open(text, '_blank');
+            } else {
+                navigator.clipboard.writeText(text);
+                alert("Text copied to clipboard!");
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('result-modal').classList.remove('active');
+        }
+
+        // --- UI & THEME TOGGLES ---
+        function toggleTheme() {
+            const body = document.body;
+            const themeBtn = document.getElementById('theme-toggle');
+            if (body.getAttribute('data-theme') === 'dark') {
+                body.setAttribute('data-theme', 'light');
+                themeBtn.innerHTML = '<i class="fa-solid fa-sun"></i>';
+            } else {
+                body.setAttribute('data-theme', 'dark');
+                themeBtn.innerHTML = '<i class="fa-solid fa-moon"></i>';
+            }
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.view-panel').forEach(panel => panel.classList.remove('active'));
             
-            // Move particles outward and toward camera
-            let x = posAttr.getX(i) + velocities[i * 3];
-            let y = posAttr.getY(i) + velocities[i * 3 + 1];
-            let z = posAttr.getZ(i) + velocities[i * 3 + 2];
-
-            // Fade particles out gradually
-            currentAlpha -= 0.015;
-
-            posAttr.setXYZ(i, x, y, z);
-            alphaAttr.setX(i, Math.max(0, currentAlpha));
-          }
+            event.target.classList.add('active');
+            document.getElementById(`${tabName}-view`).classList.add('active');
         }
 
-        posAttr.needsUpdate = true;
-        alphaAttr.needsUpdate = true;
-
-        if (activeCount === 0) {
-          isExploding = false;
-          statusText.innerText = "Status: Animation complete! Result ready.";
+        function renderHistory() {
+            const container = document.getElementById('history-container');
+            if (historyData.length === 0) return;
+            container.innerHTML = historyData.map(item => `
+                <div class="history-item">
+                    <span>${item.text}</span>
+                    <small style="color:var(--text-sub);">${item.date}</small>
+                </div>
+            `).join('');
         }
-      }
 
-      renderer.render(scene, camera);
-    }
+        function generateQR() {
+            const input = document.getElementById('qr-input').value;
+            const output = document.getElementById('qrcode-output');
+            output.innerHTML = "";
+            if (input.trim() !== "") {
+                new QRCode(output, { text: input, width: 180, height: 180 });
+            }
+        }
 
-    animate();
-  </script>
+        window.addEventListener('load', initScanner);
+    </script>
 </body>
 </html>
