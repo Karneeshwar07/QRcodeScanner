@@ -248,6 +248,8 @@
             margin-bottom: 1.5rem;
             border: 1px solid var(--card-border);
             color: var(--accent-glow);
+            font-weight: 600;
+            font-size: 1.1rem;
         }
 
         .history-list {
@@ -284,9 +286,9 @@
 
     <main>
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('scanner')">Scanner</button>
-            <button class="tab-btn" onclick="switchTab('generator')">Generator</button>
-            <button class="tab-btn" onclick="switchTab('history')">History</button>
+            <button class="tab-btn active" onclick="switchTab('scanner', this)">Scanner</button>
+            <button class="tab-btn" onclick="switchTab('generator', this)">Generator</button>
+            <button class="tab-btn" onclick="switchTab('history', this)">History</button>
         </div>
 
         <!-- SCANNER VIEW -->
@@ -305,7 +307,7 @@
         <div id="generator-view" class="view-panel">
             <input type="text" id="qr-input" placeholder="Enter URL or Text..." style="width:100%; padding:12px; border-radius:12px; border:1px solid var(--card-border); background:var(--card-bg); color:var(--text-main); margin-bottom:1rem;">
             <button class="btn btn-primary" onclick="generateQR()">Generate Code</button>
-            <div id="qrcode-output" style="margin-top: 1.5rem;"></div>
+            <div id="qrcode-output" style="margin-top: 1.5rem; background: #fff; padding: 16px; border-radius: 16px;"></div>
         </div>
 
         <!-- HISTORY VIEW -->
@@ -322,7 +324,7 @@
             <h3 class="modal-title" id="modal-type-title">Scan Result</h3>
             <div class="result-box" id="result-text"></div>
             <div style="display:flex; gap:10px; justify-content:center;">
-                <button class="btn btn-primary" onclick="openResultLink()">Open Link / Pay</button>
+                <button class="btn btn-primary" onclick="openResultLink()">Open / Copy</button>
                 <button class="btn" onclick="closeModal()">Close</button>
             </div>
         </div>
@@ -335,6 +337,7 @@
         let activeCameraId = null;
         let isTorchOn = false;
         let historyData = [];
+        let isProcessingScan = false;
 
         // --- THREE.JS SCENE SETUP ---
         const canvas = document.getElementById('three-canvas');
@@ -346,24 +349,23 @@
         renderer.setSize(340, 340);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-        // 3D White Target Frame Box
+        // White 3D Container Box Frame
         const frameGroup = new THREE.Group();
         const boxGeo = new THREE.BoxGeometry(3.2, 3.2, 0.15);
         const boxEdges = new THREE.EdgesGeometry(boxGeo);
         const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 });
         const wireframeBox = new THREE.LineSegments(boxEdges, lineMat);
         frameGroup.add(wireframeBox);
-
         scene.add(frameGroup);
 
-        // Dynamic QR Image Texture Mesh
+        // Solid QR Mesh Inside 3D Box
         const qrPlaneGeo = new THREE.PlaneGeometry(2.8, 2.8);
         const qrPlaneMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
         const qrMesh = new THREE.Mesh(qrPlaneGeo, qrPlaneMat);
         qrMesh.position.z = 0.01;
         scene.add(qrMesh);
 
-        // Particle Disintegration System
+        // Disintegration Particle Grid
         const PARTICLE_COUNT = 1600;
         const particleGeo = new THREE.BufferGeometry();
         const positions = new Float32Array(PARTICLE_COUNT * 3);
@@ -381,8 +383,8 @@
                 positions[pIndex * 3 + 1] = 1.4 - i * step - step / 2;
                 positions[pIndex * 3 + 2] = 0.01;
 
-                velocities[pIndex * 3] = (Math.random() - 0.5) * 0.05;
-                velocities[pIndex * 3 + 1] = (Math.random() - 0.5) * 0.05;
+                velocities[pIndex * 3] = (Math.random() - 0.5) * 0.06;
+                velocities[pIndex * 3 + 1] = (Math.random() - 0.5) * 0.06;
                 velocities[pIndex * 3 + 2] = Math.random() * 0.08 + 0.03;
 
                 uvs[pIndex * 2] = j / gridRes;
@@ -429,8 +431,11 @@
         let isExploding = false;
 
         // --- SCAN DETECTION & 3D ANIMATION LOGIC ---
-        function handleScanSuccess(resultText) {
-            // 1. Capture current video frame as texture
+        function handleScanSuccess(rawDecodedText) {
+            if (isProcessingScan) return;
+            isProcessingScan = true;
+
+            // 1. Capture current video frame to display inside 3D frame
             const video = document.getElementById('webcam');
             const captureCanvas = document.createElement('canvas');
             captureCanvas.width = 256;
@@ -443,22 +448,22 @@
             qrMesh.material.needsUpdate = true;
             particleMaterial.uniforms.uTexture.value = frameTexture;
 
-            // 2. Lock & Hold static QR code inside white 3D frame
+            // 2. Lock & hold static QR frame visible inside 3D white box
             qrMesh.material.opacity = 1.0;
             isExploding = false;
             resetParticles();
 
-            // 3. Pause briefly (600ms) so QR code is visible before shattering into pieces
+            // 3. Pause briefly (700ms) so user sees the QR code inside 3D box first
             setTimeout(() => {
                 qrMesh.material.opacity = 0.0;
                 showParticles();
                 isExploding = true;
 
-                // 4. Show Modal Result after particle breakdown completes
+                // 4. Reveal scan result modal after disintegration completes
                 setTimeout(() => {
-                    processScanResult(resultText);
-                }, 800);
-            }, 600);
+                    processScanResult(rawDecodedText);
+                }, 750);
+            }, 700);
         }
 
         function resetParticles() {
@@ -482,12 +487,18 @@
             alphaAttr.needsUpdate = true;
         }
 
-        // Animation Render Loop
+        // Render Loop
         function animate() {
             requestAnimationFrame(animate);
 
-            frameGroup.rotation.y = Math.sin(Date.now() * 0.001) * 0.1;
-            frameGroup.rotation.x = Math.cos(Date.now() * 0.001) * 0.05;
+            // Subtle rotation / tilt during scan phase
+            if (!isProcessingScan) {
+                frameGroup.rotation.y = Math.sin(Date.now() * 0.001) * 0.12;
+                frameGroup.rotation.x = Math.cos(Date.now() * 0.001) * 0.06;
+            } else {
+                frameGroup.rotation.y = THREE.MathUtils.lerp(frameGroup.rotation.y, 0, 0.1);
+                frameGroup.rotation.x = THREE.MathUtils.lerp(frameGroup.rotation.x, 0, 0.1);
+            }
             qrMesh.rotation.copy(frameGroup.rotation);
 
             if (isExploding) {
@@ -530,8 +541,10 @@
 
         function startScanning(deviceId) {
             codeReader.decodeFromVideoDevice(deviceId, 'webcam', (result, err) => {
-                if (result && !isExploding && qrMesh.material.opacity === 0) {
-                    handleScanSuccess(result.getText());
+                if (result && !isProcessingScan) {
+                    // Correct raw decoded string from ZXing decoder
+                    const exactText = result.getText();
+                    handleScanSuccess(exactText);
                 }
             });
         }
@@ -544,16 +557,14 @@
 
             resultBox.innerText = text;
 
-            // Detect payment UPI or Web URLs safely
-            if (text.startsWith('upi://') || text.includes('pay')) {
-                titleBox.innerText = "Payment QR Detected";
+            if (text.startsWith('upi://') || text.toLowerCase().includes('pay')) {
+                titleBox.innerText = "Payment Details Detected";
             } else if (text.startsWith('http://') || text.startsWith('https://')) {
-                titleBox.innerText = "Web Link Detected";
+                titleBox.innerText = "Web URL Detected";
             } else {
-                titleBox.innerText = "Scan Result";
+                titleBox.innerText = "Decoded Result";
             }
 
-            // Save to history list
             historyData.unshift({ text, date: new Date().toLocaleTimeString() });
             renderHistory();
 
@@ -566,12 +577,13 @@
                 window.open(text, '_blank');
             } else {
                 navigator.clipboard.writeText(text);
-                alert("Text copied to clipboard!");
+                alert("Copied to clipboard!");
             }
         }
 
         function closeModal() {
             document.getElementById('result-modal').classList.remove('active');
+            isProcessingScan = false;
         }
 
         // --- UI & THEME TOGGLES ---
@@ -587,11 +599,11 @@
             }
         }
 
-        function switchTab(tabName) {
+        function switchTab(tabName, element) {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.view-panel').forEach(panel => panel.classList.remove('active'));
             
-            event.target.classList.add('active');
+            element.classList.add('active');
             document.getElementById(`${tabName}-view`).classList.add('active');
         }
 
@@ -611,7 +623,12 @@
             const output = document.getElementById('qrcode-output');
             output.innerHTML = "";
             if (input.trim() !== "") {
-                new QRCode(output, { text: input, width: 180, height: 180 });
+                new QRCode(output, { 
+                    text: input, 
+                    width: 200, 
+                    height: 200,
+                    correctLevel: QRCode.CorrectLevel.H 
+                });
             }
         }
 
