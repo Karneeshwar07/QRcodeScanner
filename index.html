@@ -18,9 +18,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 
-<!-- ZXing: a well-established, widely-used QR/barcode reading library -->
+<!-- ZXing: QR/barcode reading library -->
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js" defer></script>
-<!-- For generating QR codes (the "Generate" tab) -->
+<!-- QRCode generator library -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js" defer></script>
 
 <style>
@@ -198,7 +198,6 @@
     .viewfinder.scanning .laser { animation: none; top: 50%; opacity: 0.5; }
   }
 
-  /* Continuous pulsing glow around the whole frame while actively scanning */
   @keyframes framePulse {
     0%, 100% { box-shadow: 0 0 0 2px rgba(0,217,163,0.4), 0 0 26px 3px rgba(0,217,163,0.28); }
     50%      { box-shadow: 0 0 0 2px rgba(124,92,255,0.5), 0 0 32px 6px rgba(124,92,255,0.4); }
@@ -208,7 +207,6 @@
     .viewfinder.scanning { animation: none; box-shadow: 0 0 0 2px rgba(0,217,163,0.4); }
   }
 
-  /* Detection flash — plays for a moment right when a code locks in */
   @keyframes cornerFlash {
     0%   { transform: scale(1);    opacity: 0.9; border-color: var(--accent); }
     45%  { transform: scale(1.12); opacity: 1;   border-color: #ffffff; }
@@ -242,14 +240,7 @@
   .viewfinder.detected .detectCheck {
     animation: checkPop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3);
   }
-  @media (prefers-reduced-motion: reduce) {
-    .viewfinder.detected .corner { animation: none; border-color: #ffffff; }
-    .viewfinder.detected .laser { animation: none; }
-    .viewfinder.detected .detectCheck { animation: none; opacity: 1; }
-  }
 
-  /* Frozen camera frame that zooms toward the viewer from the exact spot
-     the code was detected — the "Paytm-style" lock-on effect */
   .captureCanvas {
     position: absolute;
     inset: 0;
@@ -268,7 +259,6 @@
     100% { transform: scale(2.6);  opacity: 0; }
   }
 
-  /* Expanding ring "ping" marking the exact detected point */
   .pingRing {
     position: absolute;
     width: 16px;
@@ -288,10 +278,6 @@
   @keyframes pingPulse {
     0%   { transform: scale(0.6); opacity: 0.9; }
     100% { transform: scale(10);  opacity: 0; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .captureCanvas.zooming { animation: none; opacity: 0; }
-    .pingRing.pinging { animation: none; opacity: 0; }
   }
 
   .primaryBtn {
@@ -319,7 +305,6 @@
     box-shadow: none;
   }
 
-  /* Branded primary "Scan" CTA — gradient + icon, distinct from other buttons */
   .scanBtn {
     display: flex;
     align-items: center;
@@ -337,13 +322,10 @@
     color: var(--text-mid);
   }
   .scanIcon { flex-shrink: 0; }
-  .scanBtn:disabled .scanIcon { opacity: 0.5; }
 
   .status { text-align: center; color: var(--text-mid); font-size: 13px; margin: 10px 0 0 0; }
-
   .uploadSection { text-align: center; margin-top: 18px; }
 
-  /* Tab bar */
   .tabBar {
     display: flex;
     background: var(--bg-panel);
@@ -373,7 +355,6 @@
   .tabPanel[hidden] { display: none; }
   .tabIntro { color: var(--text-mid); font-size: 13.5px; margin: 0 0 14px 0; }
 
-  /* Torch button, floats top-right of the viewfinder */
   .torchBtn {
     position: absolute;
     top: 14px;
@@ -392,7 +373,6 @@
   }
   .torchBtn.on { background: var(--accent); color: var(--accent-dark); border-color: var(--accent); }
 
-  /* Generate QR tab */
   .genInput {
     width: 100%;
     background: var(--bg-panel);
@@ -419,7 +399,6 @@
   .genActions { display: flex; gap: 10px; margin-top: 16px; }
   .genActions .secondaryBtn { flex: 1; }
 
-  /* History tab */
   .historyHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
   .clearBtn {
     background: transparent;
@@ -523,9 +502,6 @@
     transform-origin: top center;
     animation: ticketFlipIn 0.5s cubic-bezier(0.25, 0.7, 0.3, 1.05);
   }
-  @media (prefers-reduced-motion: reduce) {
-    .ticket.flipIn { animation: none; }
-  }
   @keyframes scanAreaFlipOut {
     from { opacity: 1; transform: rotateX(0deg); }
     to   { opacity: 0; transform: rotateX(-70deg); }
@@ -534,9 +510,7 @@
     transform-origin: bottom center;
     animation: scanAreaFlipOut 0.4s cubic-bezier(0.4, 0.1, 0.3, 1) forwards;
   }
-  @media (prefers-reduced-motion: reduce) {
-    #scanArea.flipOut { animation: none; opacity: 0; }
-  }
+
   .ticketNotch {
     position: absolute;
     top: -12px;
@@ -779,27 +753,23 @@
   const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
   let codeReader;
-  let currentMode = 'auto';       // 'auto' | 'qr' | 'barcode'
+  let currentMode = 'auto';       
   let cameraActive = false;
   let lastUploadedFile = null;
 
-  // ---------- Format sets per mode ----------
+  // Optimized decode formats to keep scanning fast and CPU usage low
   function formatsForMode(mode) {
     const BF = ZXing.BarcodeFormat;
     if (mode === 'qr') return [BF.QR_CODE];
     if (mode === 'barcode') {
-      return [BF.EAN_13, BF.EAN_8, BF.UPC_A, BF.UPC_E, BF.CODE_128, BF.CODE_39, BF.ITF, BF.PDF_417, BF.DATA_MATRIX, BF.AZTEC, BF.CODABAR];
+      return [BF.EAN_13, BF.CODE_128, BF.UPC_A, BF.CODE_39, BF.EAN_8];
     }
-    return [BF.QR_CODE, BF.EAN_13, BF.EAN_8, BF.UPC_A, BF.UPC_E, BF.CODE_128, BF.CODE_39, BF.ITF, BF.PDF_417, BF.DATA_MATRIX, BF.AZTEC, BF.CODABAR];
+    return [BF.QR_CODE, BF.EAN_13, BF.CODE_128, BF.UPC_A];
   }
 
   function buildReader(mode) {
     const hints = new Map();
     hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formatsForMode(mode));
-    // TRY_HARDER makes 1D barcode decoding more aggressive, which also makes
-    // it more prone to misreading random pixels as a short garbage code.
-    // Only enable it when the user has confirmed exactly what they're
-    // scanning (QR Only / Barcode Only) — not in Auto mode.
     if (mode !== 'auto') {
       hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
     }
@@ -808,12 +778,10 @@
 
   function safeReset() {
     if (codeReader) {
-      try { codeReader.reset(); } catch (e) { /* ignore */ }
+      try { codeReader.reset(); } catch (e) { }
     }
-    // Also explicitly stop the camera stream — without this, a stale video
-    // track can linger and bleed into the next scan attempt
     if (videoEl.srcObject) {
-      try { videoEl.srcObject.getTracks().forEach(t => t.stop()); } catch (e) { /* ignore */ }
+      try { videoEl.srcObject.getTracks().forEach(t => t.stop()); } catch (e) { }
       videoEl.srcObject = null;
     }
     cameraActive = false;
@@ -821,7 +789,6 @@
     torchBtn.classList.remove('on');
   }
 
-  // ---------- Torch / flashlight ----------
   function getVideoTrack() {
     const stream = videoEl.srcObject;
     return stream ? stream.getVideoTracks()[0] : null;
@@ -839,18 +806,6 @@
     }
   });
 
-  function checkTorchSupport() {
-    const track = getVideoTrack();
-    if (!track || !track.getCapabilities) { torchBtn.hidden = true; return; }
-    try {
-      const caps = track.getCapabilities();
-      torchBtn.hidden = !caps.torch;
-    } catch (e) {
-      torchBtn.hidden = true;
-    }
-  }
-
-  // ---------- Tabs ----------
   const tabPanels = { scan: scanTab, generate: generateTab, history: historyTab };
   tabButtons.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -859,8 +814,6 @@
       Object.entries(tabPanels).forEach(([name, panel]) => {
         panel.hidden = name !== tab;
       });
-      // Leaving the scan tab while the camera's running should stop it,
-      // so it's not left running invisibly in the background
       if (tab !== 'scan' && cameraActive) {
         safeReset();
         startCameraBtn.style.display = "block";
@@ -873,7 +826,6 @@
     });
   });
 
-  // ---------- Scan history (saved on this device only) ----------
   const HISTORY_KEY = 'universalScannerHistory';
 
   function loadHistory() {
@@ -893,9 +845,8 @@
         label: link ? link.label : 'Text',
         time: Date.now()
       });
-      // Keep this reasonably small so localStorage doesn't grow forever
       localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 100)));
-    } catch (e) { /* storage full or unavailable — skip saving silently */ }
+    } catch (e) { }
   }
 
   function timeAgo(ts) {
@@ -929,9 +880,7 @@
         const item = history[parseInt(el.dataset.index, 10)];
         if (!item) return;
         navigator.clipboard.writeText(item.text).then(() => {
-          statusEl.textContent = "";
-          el.style.opacity = "0.6";
-          setTimeout(() => { el.style.opacity = "1"; }, 300);
+          statusEl.textContent = "Copied history item to clipboard";
         }).catch(() => {});
       });
     });
@@ -942,12 +891,11 @@
     renderHistory();
   });
 
-  // ---------- Generate QR ----------
   function drawGeneratedQr() {
     const text = genInput.value.trim();
     if (!text) return;
     if (typeof QRCode === "undefined") {
-      alert("QR generator library failed to load. Check your internet connection.");
+      alert("QR generator library failed to load.");
       return;
     }
     QRCode.toCanvas(genCanvas, text, { width: 260, margin: 2 }, (err) => {
@@ -970,7 +918,7 @@
       if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
           await navigator.share({ files: [file], title: 'QR Code' });
-        } catch (e) { /* user cancelled — fine */ }
+        } catch (e) { }
       } else if (navigator.share) {
         navigator.share({ text: genInput.value.trim() }).catch(() => {});
       } else {
@@ -978,7 +926,6 @@
       }
     });
   });
-
 
   modeButtons.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -990,7 +937,6 @@
     });
   });
 
-  // ---------- Link classification ----------
   function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
@@ -999,20 +945,16 @@
 
   function classifyLink(text) {
     const t = text.trim();
-    if (/^upi:\/\//i.test(t)) return { url: t, label: "💳 Click to Pay", cssClass: "pay", appHint: "your UPI app (GPay / PhonePe / Paytm)", externalApp: true };
-    if (/^tel:/i.test(t)) return { url: t, label: "📞 Click to Call", cssClass: "call", appHint: "your dialer", externalApp: true };
-    if (/^mailto:/i.test(t)) return { url: t, label: "📧 Click to Email", cssClass: "mail", appHint: "your email app", externalApp: true };
+    if (/^upi:\/\//i.test(t)) return { url: t, label: "💳 Pay via UPI App", cssClass: "pay", appHint: "GPay, PhonePe, or Paytm", externalApp: true };
+    if (/^tel:/i.test(t)) return { url: t, label: "📞 Call Number", cssClass: "call", appHint: "your phone dialer", externalApp: true };
+    if (/^mailto:/i.test(t)) return { url: t, label: "📧 Send Email", cssClass: "mail", appHint: "your email app", externalApp: true };
     if (/^https?:\/\//i.test(t) || /^www\./i.test(t)) {
       const url = t.startsWith("http") ? t : "https://" + t;
-      return { url: url, label: "🔗 Click to Open Link", cssClass: "web", appHint: "your browser", externalApp: false };
+      return { url: url, label: "🔗 Open Web Link", cssClass: "web", appHint: "your browser", externalApp: false };
     }
     return null;
   }
 
-  // ---------- Detection feedback (sound + vibration) ----------
-  // A synthesized chime (not a loaded audio file) so there's zero load delay.
-  // Browsers require audio to start from a real user gesture, so the
-  // AudioContext gets created/resumed when Start Camera is tapped.
   let audioCtx = null;
   function ensureAudioReady() {
     try {
@@ -1021,13 +963,12 @@
       } else if (audioCtx.state === 'suspended') {
         audioCtx.resume();
       }
-    } catch (e) { /* Web Audio unsupported — sound just won't play */ }
+    } catch (e) { }
   }
 
   function playFoundSound() {
     if (!audioCtx) return;
     const now = audioCtx.currentTime;
-    // Quick two-note upward chime — short and satisfying, not a jingle
     const notes = [
       { freq: 1046.5, start: 0,    dur: 0.11 },
       { freq: 1568.0, start: 0.09, dur: 0.18 }
@@ -1050,7 +991,7 @@
   function playFoundHaptic() {
     try {
       if (navigator.vibrate) navigator.vibrate([15, 30, 40]);
-    } catch (e) { /* vibration unsupported on this device/browser */ }
+    } catch (e) { }
   }
 
   function playFoundFeedback() {
@@ -1058,12 +999,6 @@
     playFoundHaptic();
   }
 
-  // ---------- Handling a successful scan ----------
-  // "Lock-on" effect — freezes the camera frame at the moment of detection,
-  // drops a ping right on the code's exact position, then zooms the frozen
-  // frame outward from that spot (like the code is flying toward you)
-  // before revealing the result. Falls back to a simpler flash if we don't
-  // have a usable position (e.g. some barcode formats only give 2 points).
   function playLockOnEffect(decodedText, points) {
     const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
     if (!vw || !vh || !points || points.length < 2) {
@@ -1071,13 +1006,11 @@
       return;
     }
 
-    // Capture the current frame before the camera stream gets stopped
     captureCanvas.width = vw;
     captureCanvas.height = vh;
     const ctx = captureCanvas.getContext('2d');
     ctx.drawImage(videoEl, 0, 0, vw, vh);
 
-    // Bounding box of the detected code, in native video pixel coordinates
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     points.forEach(p => {
       const x = p.getX ? p.getX() : p.x;
@@ -1088,8 +1021,6 @@
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
 
-    // Map that native-pixel point to where it actually appears on screen —
-    // the video is shown with object-fit: cover, which crops/scales it
     const dispW = viewfinderWrap.clientWidth, dispH = viewfinderWrap.clientHeight;
     const coverScale = Math.max(dispW / vw, dispH / vh);
     const offsetX = (vw * coverScale - dispW) / 2;
@@ -1105,14 +1036,12 @@
     modeAskSection.hidden = true;
     statusEl.textContent = "✅ Code found";
 
-    // Ping marks the exact spot the code was found
     pingRing.style.left = `${dispX}px`;
     pingRing.style.top = `${dispY}px`;
     pingRing.classList.remove('pinging');
     void pingRing.offsetWidth;
     pingRing.classList.add('pinging');
 
-    // The frozen frame zooms outward from that same spot
     captureCanvas.style.transformOrigin = `${originXPct}% ${originYPct}%`;
     captureCanvas.classList.remove('zooming');
     void captureCanvas.offsetWidth;
@@ -1135,8 +1064,6 @@
     modeAskSection.hidden = true;
 
     if (fromCamera) {
-      // Freeze the laser, flash the corner brackets, and pop a checkmark —
-      // a clear "locked on" moment instead of the view just vanishing
       playFoundFeedback();
       viewfinderWrap.classList.remove('scanning');
       viewfinderWrap.classList.add('detected');
@@ -1156,8 +1083,14 @@
     }, fromCamera ? 480 : 260);
   }
 
+  // Trigger payment apps directly via JS without triggering browser ERR_UNKNOWN_URL_SCHEME
+  window.triggerDeepLink = function(url) {
+    window.location.href = url;
+  };
+
   function revealResult(decodedText) {
     const link = classifyLink(decodedText);
+    saveToHistory(decodedText, link);
 
     const glowColors = {
       pay: "rgba(22,163,74,0.4)",
@@ -1171,13 +1104,17 @@
     );
 
     if (link) {
-      const targetAttr = link.externalApp ? "" : ` target="_blank" rel="noopener"`;
       const badge = link.cssClass === "pay"
         ? `<div class="verifyBadge"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#2563eb"/><path d="M7.5 12.5L10.5 15.5L16.5 9" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>UPI Payment Code Detected</div>`
         : "";
+
+      const actionBtnMarkup = link.externalApp
+        ? `<button class="actionBtn ${link.cssClass}" type="button" onclick="triggerDeepLink('${escapeHtml(link.url)}')">${link.label}</button>`
+        : `<a class="actionBtn ${link.cssClass}" href="${escapeHtml(link.url)}" target="_blank" rel="noopener">${link.label}</a>`;
+
       resultContent.innerHTML =
         badge +
-        `<a class="actionBtn ${link.cssClass}" href="${escapeHtml(link.url)}"${targetAttr}>${link.label}</a>` +
+        actionBtnMarkup +
         `<button class="copyBtn" id="copyBtn" type="button">📋 Copy Link</button>` +
         `<p class="hintText">If tapping doesn't open anything, copy the link and paste it into ${link.appHint}.</p>` +
         `<div class="rawLink">${escapeHtml(decodedText)}</div>`;
@@ -1196,16 +1133,14 @@
     }
 
     dashboard.hidden = false;
-    // Retrigger the flip-in animation even if the ticket was already shown before
     dashboard.classList.remove('flipIn');
     void dashboard.offsetWidth;
     dashboard.classList.add('flipIn');
   }
 
-  // ---------- Live camera ----------
   async function startScanner() {
     if (typeof ZXing === "undefined") {
-      statusEl.textContent = "Scanner library failed to load. Check your internet connection and reload.";
+      statusEl.textContent = "Scanner library failed to load. Check your internet connection.";
       return;
     }
 
@@ -1222,48 +1157,52 @@
     statusEl.textContent = "Requesting camera access…";
     fileInput.value = "";
 
-    let startTimedOut = false;
-    const startTimeout = setTimeout(() => {
-      startTimedOut = true;
-      startCameraBtn.disabled = false;
-      startBtnLabel.textContent = "Scan";
-      statusEl.textContent = "Camera is taking too long to start. Try again, or use Upload below.";
-    }, 12000);
+    // High resolution and frame rate parameters for sharper, smoother video
+    const constraints = {
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        frameRate: { ideal: 30 }
+      }
+    };
 
     try {
       await codeReader.decodeFromConstraints(
-        { video: { facingMode: "environment" } },
+        constraints,
         videoEl,
         (result, err) => {
           if (result) {
             const fmt = result.getBarcodeFormat ? result.getBarcodeFormat() : null;
             const text = result.getText();
-            // In Auto mode, 1D barcode decoders occasionally misread random
-            // pixels as a short garbage code (e.g. "BOB"). Real barcodes are
-            // essentially never this short, so ignore these and keep scanning.
             if (currentMode === 'auto' && fmt !== ZXing.BarcodeFormat.QR_CODE && text.trim().length < 5) {
               return;
             }
             const points = (result.getResultPoints && result.getResultPoints()) || [];
             playLockOnEffect(text, points);
           }
-          // err fires on every frame where nothing is found yet — that's normal, ignore it
         }
       );
-      clearTimeout(startTimeout);
-      if (startTimedOut) {
-        safeReset();
-        return;
+
+      // Force hardware continuous auto-focus if supported by device camera
+      const track = getVideoTrack();
+      if (track && track.getCapabilities) {
+        try {
+          const caps = track.getCapabilities();
+          if (caps.focusMode && caps.focusMode.includes('continuous')) {
+            await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+          }
+        } catch (e) { }
       }
+
       cameraActive = true;
       startCameraBtn.style.display = "none";
       viewfinderWrap.classList.add('scanning');
       statusEl.textContent = "Point your camera at a QR code or barcode…";
     } catch (err) {
-      clearTimeout(startTimeout);
       startCameraBtn.disabled = false;
       startBtnLabel.textContent = "Scan";
-      statusEl.textContent = "Camera access failed: " + err + " — check permissions, or use Upload below.";
+      statusEl.textContent = "Camera access failed: " + err;
     }
   }
 
@@ -1275,12 +1214,6 @@
     startScanner();
   });
 
-  // ---------- Upload a photo ----------
-  // Redraws the image at a specific size. ZXing (the JS decoder) often
-  // struggles with very large, high-resolution photos — especially ones with
-  // a logo in the center, like most UPI QR codes — so trying a few different
-  // sizes (including smaller ones) gives it a much better shot than only
-  // ever trying the original photo.
   function resizeImage(file, targetLongSide) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -1305,7 +1238,7 @@
 
   async function scanUploadedFile(file, mode) {
     if (typeof ZXing === "undefined") {
-      statusEl.textContent = "Scanner library failed to load. Check your internet connection and reload.";
+      statusEl.textContent = "Scanner library failed to load.";
       return;
     }
 
@@ -1317,9 +1250,6 @@
     safeReset();
     buildReader(mode);
 
-    // Try the original photo first, then a range of resized versions —
-    // large photos (especially with a logo in the middle) often decode
-    // better once scaled down, not just up
     const attempts = [null, 1000, 700, 450, 1600];
 
     for (const targetSize of attempts) {
@@ -1337,7 +1267,6 @@
         return;
       } catch (err) {
         URL.revokeObjectURL(url);
-        // try the next size
       }
     }
 
@@ -1345,7 +1274,7 @@
       statusEl.textContent = "Couldn't automatically detect a code in that photo.";
       modeAskSection.hidden = false;
     } else {
-      statusEl.textContent = "Couldn't find a " + (mode === 'qr' ? "QR code" : "barcode") + " in that photo. Try a clearer, closer, well-lit shot.";
+      statusEl.textContent = "Couldn't find a " + (mode === 'qr' ? "QR code" : "barcode") + " in that photo.";
     }
   }
 
@@ -1363,14 +1292,9 @@
     if (lastUploadedFile) scanUploadedFile(lastUploadedFile, 'barcode');
   });
 
-  // No auto-start — browsers (especially mobile Safari) require a real user
-  // tap before they'll show the camera permission prompt.
-
-  // Register the service worker so the browser offers "Add to Home Screen" /
-  // "Install app". This has no effect on scanning itself.
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('service-worker.js').catch(() => { /* ignore */ });
+      navigator.serviceWorker.register('service-worker.js').catch(() => { });
     });
   }
 </script>
