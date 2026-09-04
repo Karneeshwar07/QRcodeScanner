@@ -22,11 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 <!-- kjua: Lightweight & fast QR generator -->
   <script src="https://cdn.jsdelivr.net/npm/kjua@0.9.0/dist/kjua.min.js"></script>
-<!-- Firebase Core & Auth SDKs -->
+<!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-<!-- kjua QR Library -->
-<script src="https://cdn.jsdelivr.net/npm/kjua@0.9.0/dist/kjua.min.js"></script>
 
 <script>
   const firebaseConfig = {
@@ -39,17 +37,11 @@
     measurementId: "G-3EWK0GXR94"
   };
 
-  // Initialize Firebase immediately
-  if (window.firebase && !firebase.apps.length) {
+  if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
   }
 
   function loginWithGoogle() {
-    if (!window.firebase || !firebase.auth) {
-      alert("Firebase libraries failed to load from CDN. Please check your internet connection or ad-blocker.");
-      return;
-    }
-
     const provider = new firebase.auth.GoogleAuthProvider();
     firebase.auth().signInWithPopup(provider)
       .then((result) => {
@@ -61,7 +53,6 @@
       });
   }
 </script>
-
 
 <style>
   :root {
