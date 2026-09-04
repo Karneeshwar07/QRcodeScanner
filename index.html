@@ -21,6 +21,7 @@
 <!-- ZXing: QR/barcode reading library -->
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 <!-- kjua: Lightweight & fast QR generator -->
+  <script src="https://cdn.jsdelivr.net/npm/kjua@0.9.0/dist/kjua.min.js"></script>
   <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
@@ -39,18 +40,20 @@
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
 
-  function loginWithGoogle() {
+ function loginWithGoogle() {
+    if (!firebase.apps.length) return alert("Firebase not ready!");
     const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider)
+    firebase.auth().signInWithPopup(provider)
       .then((result) => {
         alert("Welcome, " + result.user.displayName + "!");
       })
       .catch((error) => {
-        console.error("Login Error:", error.message);
+        console.error("Login Error:", error);
+        alert("Login Error: " + error.message);
       });
   }
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/kjua/0.9.0/kjua.min.js"></script>
+
 
 <style>
   :root {
