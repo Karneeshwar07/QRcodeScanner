@@ -1,0 +1,25 @@
+# Environment variables - HIDE SECRET FILES
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# Firebase
+.firebaserc
+firebase-debug.log
