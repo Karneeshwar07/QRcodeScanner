@@ -562,18 +562,23 @@
     appId: "1:674113177555:web:7cd6e92f74d9a4cb491126",
     measurementId: "G-3EWK0GXR94"
   };
-
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
+firebase.initializeApp(firebaseConfig);
 
   function loginWithGoogle() {
+    // Ensure Firebase Auth is loaded before executing
+    if (typeof firebase === "undefined" || !firebase.auth) {
+      alert("Firebase is still initializing. Please wait a second and try again.");
+      return;
+    }
+
     const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider)
+    firebase.auth().signInWithPopup(provider)
       .then((result) => {
         alert("Welcome, " + result.user.displayName + "!");
       })
       .catch((error) => {
-        console.error("Login Error:", error.message);
+        console.error("Login Error:", error);
+        alert("Login Error: " + error.message);
       });
   }
 </script>
