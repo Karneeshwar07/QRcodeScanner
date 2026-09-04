@@ -481,9 +481,9 @@
             <label for="coupon-input">Coupon Code</label>
             <input type="text" id="coupon-input" class="input-field" placeholder="Enter promo code..." maxlength="20" autocomplete="off" aria-label="Enter coupon code" />
             <button class="btn" id="apply-coupon-btn" aria-label="Apply coupon code">Redeem Coupon</button>
-            <p style="color: var(--text-sub); font-size: 0.8rem; margin-top: 8px;">
-              Try: <code style="background: #0f172a; padding: 2px 6px; border-radius: 4px;">WELCOME500</code> or <code style="background: #0f172a; padding: 2px 6px; border-radius: 4px;">BONUS1000</code>
-            </p>
+                       <p style="color: var(--text-sub); font-size: 0.8rem; margin-top: 8px;">
+              Try: <code style="background: #0f172a; padding: 2px 6px; border-radius: 4px;">WELCOME500</code>, <code style="background: #0f172a; padding: 2px 6px; border-radius: 4px;">BONUS1000</code>, or <code style="background: #0f172a; padding: 2px 6px; border-radius: 4px;">SCANNER2024</code>
+            </p>>
           </div>
         </div>
 
@@ -547,30 +547,10 @@
 
   <!-- 6. Application Logic (Firebase Modular SDK v10 & ZXing QR Engine) -->
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/esm/index.min.js';
-
-    // ==========================================
-    // IMPROVEMENT #1: Move Firebase Config to Environment Variable
-    // In production, use: const firebaseConfig = JSON.parse(process.env.FIREBASE_CONFIG);
-    // For now, consider moving this to a separate config.js file
-    // ==========================================
-    
-    const firebaseConfig = {
-      apiKey: "AIzaSyCLC-EhtmE-PrxllWS7E9H0RBVW2SWv4NU",
-      authDomain: "qr-scanner-07.firebaseapp.com",
-      projectId: "qr-scanner-07",
-      storageBucket: "qr-scanner-07.firebasestorage.app",
-      messagingSenderId: "674113177555",
-      appId: "1:674113177555:web:7cd6e92f74d9a4cb491126",
-      measurementId: "G-3EWK0GXR94"
-    };
-
-    // ⚠️ WARNING: These credentials are now visible. You should:
-    // 1. Regenerate these credentials in Firebase Console
-    // 2. Move config to backend environment variable
-    // 3. Use Firebase Security Rules to restrict access
+    import { firebaseConfig, COUPON_CODES, CONSTANTS } from './config.js';
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -627,10 +607,7 @@
     let lastScanTime = 0;
     const SCAN_COOLDOWN_MS = 2000; // Prevent duplicate scans within 2 seconds
 
-    const validCoupons = {
-      "WELCOME500": 500,
-      "BONUS1000": 1000
-    };
+  
 
     // ==========================================
     // IMPROVEMENT #4: Camera Cleanup Helper
@@ -787,8 +764,8 @@
         return;
       }
 
-      if (validCoupons[code]) {
-        const reward = validCoupons[code];
+         if (COUPON_CODES[code]) {
+        const reward = COUPON_CODES[code];
         userCoins += reward;
         usedCoupons.push(code);
         localStorage.setItem('usedCoupons', JSON.stringify(usedCoupons));
