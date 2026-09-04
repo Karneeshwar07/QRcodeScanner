@@ -37,21 +37,26 @@
     measurementId: "G-3EWK0GXR94"
   };
 
-  if (!firebase.apps.length) {
+  // Initialize Firebase safely
+  if (typeof firebase !== "undefined" && !firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
   }
 
-  function loginWithGoogle() {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    firebase.auth().signInWithPopup(provider)
-      .then((result) => {
-        alert("Welcome, " + result.user.displayName + "!");
-      })
-      .catch((error) => {
-        console.error("Login Error:", error);
-        alert("Login Error: " + error.message);
-      });
-  }
+  window.loginWithGoogle = function() {
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      firebase.auth().signInWithPopup(provider)
+        .then((result) => {
+          alert("Welcome, " + result.user.displayName + "!");
+        })
+        .catch((error) => {
+          console.error("Login Error:", error);
+          alert("Login Error: " + error.message);
+        });
+    } catch (err) {
+      alert("Auth Error: " + err.message);
+    }
+  };
 </script>
 
 <style>
