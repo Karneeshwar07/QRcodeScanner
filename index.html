@@ -48,13 +48,13 @@
       align-items: center;
       justify-content: center;
       z-index: 9999;
-      animation: fadeOut 0.8s ease-in-out 2.2s forwards;
+      animation: fadeOut 0.8s ease-in-out 1.8s forwards;
     }
 
     .splash-logo {
-      font-size: 3rem;
+      font-size: 3.5rem;
       margin-bottom: 12px;
-      animation: pulse 1.5s infinite alternate;
+      animation: pulse 1.2s infinite alternate;
     }
 
     .splash-title {
@@ -62,12 +62,6 @@
       font-weight: 700;
       letter-spacing: 1.5px;
       color: var(--accent-color);
-      animation: slideUp 0.8s ease-out;
-    }
-
-    @keyframes slideUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
     }
 
     @keyframes pulse {
@@ -79,14 +73,48 @@
       to { opacity: 0; visibility: hidden; }
     }
 
-    /* --- Top Navigation Header --- */
+    /* --- Auth Screen (Landing View) --- */
+    #auth-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      padding: 24px;
+      text-align: center;
+      background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+    }
+
+    .auth-card {
+      background-color: var(--card-bg);
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 32px 24px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+
+    .auth-card h2 {
+      font-size: 1.6rem;
+      margin-bottom: 8px;
+    }
+
+    .auth-card p {
+      color: var(--text-sub);
+      font-size: 0.95rem;
+      margin-bottom: 24px;
+    }
+
+    /* --- App Header --- */
     header {
       background-color: var(--card-bg);
       padding: 12px 20px;
-      display: flex;
+      display: none;
       justify-content: space-between;
       align-items: center;
       box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      border-bottom: 1px solid #334155;
     }
 
     .app-brand {
@@ -123,7 +151,14 @@
       margin-left: 4px;
     }
 
-    /* --- Page Container & Router --- */
+    /* --- Main App Content --- */
+    #app-container {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
     main {
       flex: 1;
       overflow-y: auto;
@@ -151,6 +186,7 @@
       border-radius: 12px;
       padding: 20px;
       margin-bottom: 16px;
+      border: 1px solid #334155;
     }
 
     .card h3 {
@@ -185,14 +221,41 @@
       margin-bottom: 10px;
     }
 
-    /* --- Bottom Navigation Bar --- */
+    /* --- Quick Stats Grid --- */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat-box {
+      background-color: #0f172a;
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      text-align: center;
+    }
+
+    .stat-box .num {
+      font-size: 1.4rem;
+      font-weight: bold;
+      color: var(--accent-color);
+    }
+
+    .stat-box .label {
+      font-size: 0.8rem;
+      color: var(--text-sub);
+    }
+
+    /* --- Bottom Navigation --- */
     nav {
       position: fixed;
       bottom: 0;
       left: 0;
       width: 100%;
       background-color: var(--card-bg);
-      display: flex;
+      display: none;
       justify-content: space-around;
       padding: 12px 0;
       border-top: 1px solid #334155;
@@ -221,14 +284,26 @@
 </head>
 <body>
 
-  <!-- 1. Splash Screen Animation -->
+  <!-- 1. Animated Splash Screen -->
   <div id="splash-screen">
     <div class="splash-logo">🔍</div>
     <div class="splash-title">UNIVERSAL SCANNER</div>
   </div>
 
-  <!-- 2. Header with Persistent Coin Counter -->
-  <header>
+  <!-- 2. Authentication Screen (Shown First) -->
+  <div id="auth-screen">
+    <div class="auth-card">
+      <div style="font-size: 3rem; margin-bottom: 12px;">📱</div>
+      <h2>Welcome Back</h2>
+      <p>Sign in with your Google account to access your scanner, earn rewards, and sync your data.</p>
+      <button onclick="window.loginWithGoogle()" class="btn" style="background-color: #38bdf8;">
+        🔑 Sign in with Google
+      </button>
+    </div>
+  </div>
+
+  <!-- 3. Top Header (Shown after login) -->
+  <header id="main-header">
     <div class="app-brand">Universal Scanner</div>
     <div class="coin-badge">
       🪙 <span id="coin-count">0</span>
@@ -236,71 +311,90 @@
     </div>
   </header>
 
-  <!-- 3. Main Multi-Page Content Area -->
-  <main>
-    <!-- SCANNER PAGE -->
-    <section id="scanner-page" class="page active">
-      <div class="card">
-        <h3>Scanner</h3>
-        <button onclick="window.loginWithGoogle()" class="btn" style="background-color: #38bdf8; margin-bottom: 15px;">
-          🔑 Sign in with Google
-        </button>
-        <p style="color: var(--text-sub); font-size: 0.9rem; margin-bottom: 15px;">
-          Point your camera at a QR code or barcode to scan.
-        </p>
-        <button class="btn">📷 Open Camera</button>
-      </div>
-    </section>
-
-    <!-- REWARDS / COINS PAGE -->
-    <section id="rewards-page" class="page">
-      <div class="card">
-        <h3>🪙 Earn Coins</h3>
-        <p style="color: var(--text-sub); font-size: 0.9rem; margin-bottom: 15px;">
-          Watch videos or apply official promo codes to collect coins.
-        </p>
-
-        <div style="border-top: 1px solid #334155; pt: 12px; margin-top: 12px;">
-          <h4 style="margin: 10px 0;">Watch Ads</h4>
-          <button class="btn" onclick="watchAd()">📺 Watch Ad (+500 Coins)</button>
+  <!-- 4. Main App Container (Unlocked after login) -->
+  <div id="app-container">
+    <main>
+      <!-- SCANNER PAGE -->
+      <section id="scanner-page" class="page active">
+        <!-- Quick Stats Banner -->
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="num" id="stat-scans">0</div>
+            <div class="label">Total Scans</div>
+          </div>
+          <div class="stat-box">
+            <div class="num" id="stat-coins">0</div>
+            <div class="label">Coins Earned</div>
+          </div>
         </div>
 
-        <div style="border-top: 1px solid #334155; margin-top: 20px; padding-top: 12px;">
-          <h4 style="margin: 10px 0;">Redeem Coupon Code</h4>
-          <input type="text" id="coupon-input" class="input-field" placeholder="Enter coupon code..." />
-          <button class="btn" onclick="applyCoupon()">Redeem Coupon</button>
+        <div class="card">
+          <h3>📷 QR & Barcode Scanner</h3>
+          <p style="color: var(--text-sub); font-size: 0.9rem; margin-bottom: 15px;">
+            Point your camera at any QR code, product barcode, or web link to decode it instantly.
+          </p>
+          <button class="btn" onclick="triggerScan()">Start Camera Scan</button>
         </div>
-      </div>
 
-      <div class="card">
-        <h3>🛒 Redeem Offers</h3>
-        <p style="color: var(--text-sub); font-size: 0.9rem;">
-          Special store rewards and exchange options will appear here soon!
-        </p>
-      </div>
-    </section>
+        <div class="card">
+          <h3>🕒 Recent Scans</h3>
+          <ul id="scan-history" style="list-style: none; color: var(--text-sub); font-size: 0.9rem;">
+            <li style="padding: 8px 0; border-bottom: 1px solid #334155;">No recent scans yet. Press "Start Camera Scan" above!</li>
+          </ul>
+        </div>
+      </section>
 
-    <!-- SETTINGS & PROFILE PAGE -->
-    <section id="settings-page" class="page">
-      <div class="card">
-        <h3>👤 Profile</h3>
-        <p id="user-display" style="color: var(--text-sub); font-size: 0.9rem;">Not signed in.</p>
-      </div>
+      <!-- REWARDS PAGE -->
+      <section id="rewards-page" class="page">
+        <div class="card">
+          <h3>🪙 Earn Coins</h3>
+          <p style="color: var(--text-sub); font-size: 0.9rem; margin-bottom: 15px;">
+            Watch short video ads or apply official promo codes to add coins to your balance.
+          </p>
 
-      <div class="card">
-        <h3>⚙️ Settings & Support</h3>
-        <button class="btn" style="background-color: #334155; color: #fff; margin-bottom: 8px;" onclick="alert('Opening support dialog...')">
-          💬 Help & Support
-        </button>
-        <button class="btn" style="background-color: #334155; color: #fff;" onclick="alert('App version 1.0.0')">
-          ℹ️ About App
-        </button>
-      </div>
-    </section>
-  </main>
+          <div style="border-top: 1px solid #334155; padding-top: 12px; margin-top: 12px;">
+            <h4 style="margin: 10px 0;">Watch Ads</h4>
+            <button class="btn" onclick="watchAd()">📺 Watch Ad (+500 Coins)</button>
+          </div>
 
-  <!-- 4. Bottom Tab Navigation -->
-  <nav>
+          <div style="border-top: 1px solid #334155; margin-top: 20px; padding-top: 12px;">
+            <h4 style="margin: 10px 0;">Redeem Coupon Code</h4>
+            <input type="text" id="coupon-input" class="input-field" placeholder="Enter promo code..." />
+            <button class="btn" onclick="applyCoupon()">Redeem Coupon</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>🛒 Store & Exchanges</h3>
+          <p style="color: var(--text-sub); font-size: 0.9rem;">
+            Coin exchange options, discount vouchers, and exclusive gift rewards will be available here in upcoming updates.
+          </p>
+        </div>
+      </section>
+
+      <!-- SETTINGS & PROFILE PAGE -->
+      <section id="settings-page" class="page">
+        <div class="card">
+          <h3>👤 My Profile</h3>
+          <p id="user-display" style="color: var(--text-sub); font-size: 0.9rem; margin-bottom: 12px;">Signed in as User</p>
+          <button class="btn" style="background-color: #ef4444; color: #fff;" onclick="logout()">Sign Out</button>
+        </div>
+
+        <div class="card">
+          <h3>⚙️ Preferences & Support</h3>
+          <button class="btn" style="background-color: #334155; color: #fff; margin-bottom: 8px;" onclick="alert('Support email: support@universalscanner.com')">
+            💬 Help & Support
+          </button>
+          <button class="btn" style="background-color: #334155; color: #fff;" onclick="alert('Universal Scanner v1.2.0')">
+            ℹ️ About App
+          </button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- 5. Bottom Navigation Bar -->
+  <nav id="main-nav">
     <button class="nav-item active" onclick="navigateTo('scanner-page', this)">
       <span class="nav-icon">🔍</span>
       <span>Scanner</span>
@@ -315,9 +409,9 @@
     </button>
   </nav>
 
-  <!-- 5. Application Logic -->
+  <!-- 6. Application Logic -->
   <script>
-    // --- Firebase Initialization ---
+    // --- Firebase Setup ---
     const firebaseConfig = {
       apiKey: "AIzaSyCLC-EhtmE-PrxllWS7E9H0RBVW2SWv4NU",
       authDomain: "qr-scanner-07.firebaseapp.com",
@@ -330,7 +424,7 @@
 
     function getFirebaseAuth() {
       if (typeof firebase === "undefined") {
-        throw new Error("Firebase SDKs are loading. Please try again in a few seconds.");
+        throw new Error("Firebase SDKs are loading. Please wait a few seconds.");
       }
       if (!firebase.apps.length) {
         firebase.initializeApp(firebaseConfig);
@@ -338,14 +432,29 @@
       return firebase.auth();
     }
 
+    // Check auth status automatically on page launch
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        const auth = getFirebaseAuth();
+        auth.onAuthStateChanged((user) => {
+          if (user) {
+            showDashboard(user);
+          } else {
+            showLoginScreen();
+          }
+        });
+      } catch (e) {
+        console.log("Auth listener initialized.");
+      }
+    });
+
     window.loginWithGoogle = function() {
       try {
         const auth = getFirebaseAuth();
         const provider = new firebase.auth.GoogleAuthProvider();
         auth.signInWithPopup(provider)
           .then((result) => {
-            alert("Welcome, " + result.user.displayName + "!");
-            document.getElementById("user-display").innerText = "Signed in as: " + result.user.displayName;
+            showDashboard(result.user);
           })
           .catch((error) => {
             alert("Login Error: " + error.message);
@@ -355,7 +464,30 @@
       }
     };
 
-    // --- Page Router ---
+    function logout() {
+      const auth = getFirebaseAuth();
+      auth.signOut().then(() => {
+        showLoginScreen();
+      });
+    }
+
+    function showDashboard(user) {
+      document.getElementById('auth-screen').style.display = 'none';
+      document.getElementById('main-header').style.display = 'flex';
+      document.getElementById('app-container').style.display = 'flex';
+      document.getElementById('main-nav').style.display = 'flex';
+      
+      document.getElementById('user-display').innerText = "Signed in as: " + (user.displayName || user.email);
+    }
+
+    function showLoginScreen() {
+      document.getElementById('auth-screen').style.display = 'flex';
+      document.getElementById('main-header').style.display = 'none';
+      document.getElementById('app-container').style.display = 'none';
+      document.getElementById('main-nav').style.display = 'none';
+    }
+
+    // --- Page Navigation Router ---
     function navigateTo(pageId, navElement) {
       document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
       document.getElementById(pageId).classList.add('active');
@@ -366,11 +498,11 @@
       }
     }
 
-    // --- Coin System & Local Persistence ---
+    // --- Coin System & Local Data ---
     let userCoins = parseInt(localStorage.getItem('userCoins') || '0');
+    let scanCount = parseInt(localStorage.getItem('scanCount') || '0');
     let usedCoupons = JSON.parse(localStorage.getItem('usedCoupons') || '[]');
 
-    // Valid promo codes (Add/Change codes whenever you publish them on social media)
     const validCoupons = {
       "WELCOME500": 500,
       "BONUS1000": 1000
@@ -378,13 +510,16 @@
 
     function updateCoinDisplay() {
       document.getElementById('coin-count').innerText = userCoins;
+      document.getElementById('stat-coins').innerText = userCoins;
+      document.getElementById('stat-scans').innerText = scanCount;
       localStorage.setItem('userCoins', userCoins.toString());
+      localStorage.setItem('scanCount', scanCount.toString());
     }
 
     function watchAd() {
       userCoins += 500;
       updateCoinDisplay();
-      alert("Ad completed! You earned 500 coins.");
+      alert("Ad complete! 500 coins added.");
     }
 
     function applyCoupon() {
@@ -397,7 +532,7 @@
       }
 
       if (usedCoupons.includes(code)) {
-        alert("You have already redeemed this code on your account!");
+        alert("You have already redeemed this promo code.");
         return;
       }
 
@@ -407,14 +542,29 @@
         usedCoupons.push(code);
         localStorage.setItem('usedCoupons', JSON.stringify(usedCoupons));
         updateCoinDisplay();
-        alert(`Success! Code applied. You earned ${reward} coins.`);
+        alert(`Success! Redeemed ${reward} coins.`);
         codeInput.value = '';
       } else {
         alert("Invalid or expired coupon code.");
       }
     }
 
-    // Initialize display on startup
+    function triggerScan() {
+      scanCount++;
+      updateCoinDisplay();
+      const historyList = document.getElementById('scan-history');
+      const newEntry = document.createElement('li');
+      newEntry.style.cssText = "padding: 8px 0; border-bottom: 1px solid #334155; color: var(--text-main);";
+      newEntry.innerText = `Scan #${scanCount}: https://example.com/qr-${Math.floor(Math.random() * 8999 + 1000)}`;
+      
+      if (historyList.children[0] && historyList.children[0].innerText.includes("No recent scans")) {
+        historyList.innerHTML = '';
+      }
+      historyList.prepend(newEntry);
+      alert("Camera simulation: Code scanned successfully!");
+    }
+
+    // Initialize stats
     updateCoinDisplay();
   </script>
 </body>
