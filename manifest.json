@@ -1,20 +1,36 @@
 {
   "id": "/",
-  "name": "Universal Scanner",
+  "name": "Universal QR Code Scanner",
   "short_name": "Scanner",
-  "description": "Scan QR codes, barcodes, ID cards, and payment codes — all in one app.",
+  "description": "Scan QR codes, barcodes, ID cards, and payment codes — all in one app. Earn coins with every scan!",
   "lang": "en",
   "dir": "ltr",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "browser"],
-  "orientation": "portrait",
-  "background_color": "#0b0e12",
-  "theme_color": "#0b0e12",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#06b6d4",
   "categories": ["utilities", "productivity"],
   "related_applications": [],
   "prefer_related_applications": false,
+  "screenshots": [
+    {
+      "src": "screenshot-narrow-1.png",
+      "sizes": "720x1280",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Scan QR codes, barcodes, and payment codes"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "App icon"
+    }
+  ],
   "icons": [
     {
       "src": "icon-192.png",
@@ -41,23 +57,23 @@
       "purpose": "maskable"
     }
   ],
-  "screenshots": [
-    {
-      "src": "screenshot-narrow-1.png",
-      "sizes": "720x1280",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Scan QR codes, barcodes, and payment codes"
-    }
-  ],
   "shortcuts": [
     {
       "name": "Start Scanning",
       "short_name": "Scan",
       "description": "Jump straight into the scanner",
-      "url": "./index.html",
+      "url": "./index.html?action=scan",
       "icons": [
-        { "src": "icon-192.png", "sizes": "192x192" }
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }
+      ]
+    },
+    {
+      "name": "View Rewards",
+      "short_name": "Rewards",
+      "description": "Check your coins and redeem codes",
+      "url": "./index.html?action=rewards",
+      "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }
       ]
     }
   ]
