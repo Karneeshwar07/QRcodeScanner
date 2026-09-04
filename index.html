@@ -5,10 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Universal Scanner</title>
 
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-
   <style>
     :root {
       --bg-color: #0f172a;
@@ -35,7 +31,22 @@
       overflow: hidden;
     }
 
-    /* --- Splash Screen Animation --- */
+    /* --- Toast Notification System --- */
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 80px;
+      background: #1e293b;
+      color: #fff;
+      padding: 12px 18px;
+      border-radius: 8px;
+      border: 1px solid var(--accent-color);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+      z-index: 99999;
+      transition: opacity 0.3s ease;
+    }
+
+    /* --- Splash Screen --- */
     #splash-screen {
       position: fixed;
       top: 0;
@@ -73,7 +84,7 @@
       to { opacity: 0; visibility: hidden; }
     }
 
-    /* --- Auth Screen (Landing View) --- */
+    /* --- Auth Screen --- */
     #auth-screen {
       display: flex;
       flex-direction: column;
@@ -106,7 +117,7 @@
       margin-bottom: 24px;
     }
 
-    /* --- App Header --- */
+    /* --- Header --- */
     header {
       background-color: var(--card-bg);
       padding: 12px 20px;
@@ -151,7 +162,7 @@
       margin-left: 4px;
     }
 
-    /* --- Main App Content --- */
+    /* --- Main Container --- */
     #app-container {
       display: none;
       flex: 1;
@@ -180,7 +191,7 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
-    /* --- Card & UI Components --- */
+    /* --- Cards & UI --- */
     .card {
       background-color: var(--card-bg);
       border-radius: 12px;
@@ -221,7 +232,7 @@
       margin-bottom: 10px;
     }
 
-    /* --- Quick Stats Grid --- */
+    /* --- Stats Grid --- */
     .stats-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -248,7 +259,18 @@
       color: var(--text-sub);
     }
 
-    /* --- Bottom Navigation --- */
+    /* --- Video Scanner Viewfinder --- */
+    #scanner-viewfinder {
+      width: 100%;
+      max-height: 250px;
+      border-radius: 8px;
+      display: none;
+      margin-top: 10px;
+      background: #000;
+      object-fit: cover;
+    }
+
+    /* --- Navigation --- */
     nav {
       position: fixed;
       bottom: 0;
@@ -284,39 +306,38 @@
 </head>
 <body>
 
-  <!-- 1. Animated Splash Screen -->
+  <!-- 1. Splash Screen -->
   <div id="splash-screen">
     <div class="splash-logo">🔍</div>
     <div class="splash-title">UNIVERSAL SCANNER</div>
   </div>
 
-  <!-- 2. Authentication Screen (Shown First) -->
+  <!-- 2. Authentication Screen -->
   <div id="auth-screen">
     <div class="auth-card">
       <div style="font-size: 3rem; margin-bottom: 12px;">📱</div>
       <h2>Welcome Back</h2>
       <p>Sign in with your Google account to access your scanner, earn rewards, and sync your data.</p>
-      <button onclick="window.loginWithGoogle()" class="btn" style="background-color: #38bdf8;">
+      <button id="login-btn" class="btn" style="background-color: #38bdf8;">
         🔑 Sign in with Google
       </button>
     </div>
   </div>
 
-  <!-- 3. Top Header (Shown after login) -->
+  <!-- 3. Top Header -->
   <header id="main-header">
     <div class="app-brand">Universal Scanner</div>
     <div class="coin-badge">
-      🪙 <span id="coin-count">0</span>
-      <button class="coin-add-btn" onclick="navigateTo('rewards-page')">+</button>
+      🪙 <span id="coin-count" aria-live="polite">0</span>
+      <button class="coin-add-btn" id="coin-plus-btn">+</button>
     </div>
   </header>
 
-  <!-- 4. Main App Container (Unlocked after login) -->
+  <!-- 4. Main App Container -->
   <div id="app-container">
     <main>
       <!-- SCANNER PAGE -->
       <section id="scanner-page" class="page active">
-        <!-- Quick Stats Banner -->
         <div class="stats-grid">
           <div class="stat-box">
             <div class="num" id="stat-scans">0</div>
@@ -331,9 +352,10 @@
         <div class="card">
           <h3>📷 QR & Barcode Scanner</h3>
           <p style="color: var(--text-sub); font-size: 0.9rem; margin-bottom: 15px;">
-            Point your camera at any QR code, product barcode, or web link to decode it instantly.
+            Point your camera at any QR code, product barcode, or web link to decode it.
           </p>
-          <button class="btn" onclick="triggerScan()">Start Camera Scan</button>
+          <video id="scanner-viewfinder" playsinline></video>
+          <button class="btn" id="start-scan-btn">Start Camera Scan</button>
         </div>
 
         <div class="card">
@@ -349,18 +371,19 @@
         <div class="card">
           <h3>🪙 Earn Coins</h3>
           <p style="color: var(--text-sub); font-size: 0.9rem; margin-bottom: 15px;">
-            Watch short video ads or apply official promo codes to add coins to your balance.
+            Watch video ads or apply official promo codes to add coins to your balance.
           </p>
 
           <div style="border-top: 1px solid #334155; padding-top: 12px; margin-top: 12px;">
             <h4 style="margin: 10px 0;">Watch Ads</h4>
-            <button class="btn" onclick="watchAd()">📺 Watch Ad (+500 Coins)</button>
+            <button class="btn" id="watch-ad-btn">📺 Watch Ad (+500 Coins)</button>
           </div>
 
           <div style="border-top: 1px solid #334155; margin-top: 20px; padding-top: 12px;">
             <h4 style="margin: 10px 0;">Redeem Coupon Code</h4>
+            <label for="coupon-input" style="display:none;">Coupon Code</label>
             <input type="text" id="coupon-input" class="input-field" placeholder="Enter promo code..." />
-            <button class="btn" onclick="applyCoupon()">Redeem Coupon</button>
+            <button class="btn" id="apply-coupon-btn">Redeem Coupon</button>
           </div>
         </div>
 
@@ -372,20 +395,20 @@
         </div>
       </section>
 
-      <!-- SETTINGS & PROFILE PAGE -->
+      <!-- SETTINGS PAGE -->
       <section id="settings-page" class="page">
         <div class="card">
           <h3>👤 My Profile</h3>
           <p id="user-display" style="color: var(--text-sub); font-size: 0.9rem; margin-bottom: 12px;">Signed in as User</p>
-          <button class="btn" style="background-color: #ef4444; color: #fff;" onclick="logout()">Sign Out</button>
+          <button class="btn" style="background-color: #ef4444; color: #fff;" id="logout-btn">Sign Out</button>
         </div>
 
         <div class="card">
           <h3>⚙️ Preferences & Support</h3>
-          <button class="btn" style="background-color: #334155; color: #fff; margin-bottom: 8px;" onclick="alert('Support email: support@universalscanner.com')">
+          <button class="btn" style="background-color: #334155; color: #fff; margin-bottom: 8px;" id="help-btn">
             💬 Help & Support
           </button>
-          <button class="btn" style="background-color: #334155; color: #fff;" onclick="alert('Universal Scanner v1.2.0')">
+          <button class="btn" style="background-color: #334155; color: #fff;" id="about-btn">
             ℹ️ About App
           </button>
         </div>
@@ -395,23 +418,27 @@
 
   <!-- 5. Bottom Navigation Bar -->
   <nav id="main-nav">
-    <button class="nav-item active" onclick="navigateTo('scanner-page', this)">
+    <button class="nav-item active" data-page="scanner-page">
       <span class="nav-icon">🔍</span>
       <span>Scanner</span>
     </button>
-    <button class="nav-item" onclick="navigateTo('rewards-page', this)">
+    <button class="nav-item" data-page="rewards-page">
       <span class="nav-icon">🪙</span>
       <span>Rewards</span>
     </button>
-    <button class="nav-item" onclick="navigateTo('settings-page', this)">
+    <button class="nav-item" data-page="settings-page">
       <span class="nav-icon">⚙️</span>
       <span>Settings</span>
     </button>
   </nav>
 
-  <!-- 6. Application Logic -->
-  <script>
-    // --- Firebase Setup ---
+  <!-- 6. Application Logic (Firebase Modular SDK v10 & ZXing QR Engine) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/esm/index.min.js';
+
+    // Firebase Config
     const firebaseConfig = {
       apiKey: "AIzaSyCLC-EhtmE-PrxllWS7E9H0RBVW2SWv4NU",
       authDomain: "qr-scanner-07.firebaseapp.com",
@@ -422,61 +449,87 @@
       measurementId: "G-3EWK0GXR94"
     };
 
-    function getFirebaseAuth() {
-      if (typeof firebase === "undefined") {
-        throw new Error("Firebase SDKs are loading. Please wait a few seconds.");
-      }
-      if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-      }
-      return firebase.auth();
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const codeReader = new BrowserMultiFormatReader();
+
+    // Toast UI Component
+    function showToast(message, duration = 3000) {
+      const t = document.createElement('div');
+      t.className = 'toast';
+      t.innerText = message;
+      document.body.appendChild(t);
+      setTimeout(() => t.style.opacity = '0', duration - 300);
+      setTimeout(() => t.remove(), duration);
     }
 
-    // Check auth status automatically on page launch
-    window.addEventListener('DOMContentLoaded', () => {
-      try {
-        const auth = getFirebaseAuth();
-        auth.onAuthStateChanged((user) => {
-          if (user) {
-            showDashboard(user);
-          } else {
-            showLoginScreen();
-          }
-        });
-      } catch (e) {
-        console.log("Auth listener initialized.");
+    // State Variables
+    let userCoins = parseInt(localStorage.getItem('userCoins') || '0');
+    let scanCount = parseInt(localStorage.getItem('scanCount') || '0');
+    let usedCoupons = JSON.parse(localStorage.getItem('usedCoupons') || '[]');
+    let activeScanning = false;
+
+    const validCoupons = {
+      "WELCOME500": 500,
+      "BONUS1000": 1000
+    };
+
+    // Auth Observer
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        showDashboard(user);
+      } else {
+        showLoginScreen();
       }
     });
 
-    window.loginWithGoogle = function() {
+    // Google Sign-In
+    document.getElementById('login-btn').addEventListener('click', async () => {
+      const provider = new GoogleAuthProvider();
       try {
-        const auth = getFirebaseAuth();
-        const provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithPopup(provider)
-          .then((result) => {
-            showDashboard(result.user);
-          })
-          .catch((error) => {
-            alert("Login Error: " + error.message);
-          });
+        const result = await signInWithPopup(auth, provider);
+        showToast(`Welcome back, ${result.user.displayName || 'user'}!`);
       } catch (err) {
-        alert(err.message);
+        showToast("Login error: " + err.message);
       }
-    };
+    });
 
-    function logout() {
-      const auth = getFirebaseAuth();
-      auth.signOut().then(() => {
+    // Logout
+    document.getElementById('logout-btn').addEventListener('click', () => {
+      signOut(auth).then(() => {
         showLoginScreen();
+        showToast("Signed out successfully.");
       });
+    });
+
+    // Navigation & Router
+    function navigateTo(pageId, navElement) {
+      document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+      document.getElementById(pageId).classList.add('active');
+
+      document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+      if (navElement) {
+        navElement.classList.add('active');
+      } else {
+        const matchingNav = document.querySelector(`.nav-item[data-page="${pageId}"]`);
+        if (matchingNav) matchingNav.classList.add('active');
+      }
     }
+
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const pageId = e.currentTarget.getAttribute('data-page');
+        navigateTo(pageId, e.currentTarget);
+      });
+    });
+
+    document.getElementById('coin-plus-btn').addEventListener('click', () => navigateTo('rewards-page'));
 
     function showDashboard(user) {
       document.getElementById('auth-screen').style.display = 'none';
       document.getElementById('main-header').style.display = 'flex';
       document.getElementById('app-container').style.display = 'flex';
       document.getElementById('main-nav').style.display = 'flex';
-      
       document.getElementById('user-display').innerText = "Signed in as: " + (user.displayName || user.email);
     }
 
@@ -487,27 +540,6 @@
       document.getElementById('main-nav').style.display = 'none';
     }
 
-    // --- Page Navigation Router ---
-    function navigateTo(pageId, navElement) {
-      document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-      document.getElementById(pageId).classList.add('active');
-
-      if (navElement) {
-        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-        navElement.classList.add('active');
-      }
-    }
-
-    // --- Coin System & Local Data ---
-    let userCoins = parseInt(localStorage.getItem('userCoins') || '0');
-    let scanCount = parseInt(localStorage.getItem('scanCount') || '0');
-    let usedCoupons = JSON.parse(localStorage.getItem('usedCoupons') || '[]');
-
-    const validCoupons = {
-      "WELCOME500": 500,
-      "BONUS1000": 1000
-    };
-
     function updateCoinDisplay() {
       document.getElementById('coin-count').innerText = userCoins;
       document.getElementById('stat-coins').innerText = userCoins;
@@ -516,25 +548,19 @@
       localStorage.setItem('scanCount', scanCount.toString());
     }
 
-    function watchAd() {
+    // Ads & Coupons
+    document.getElementById('watch-ad-btn').addEventListener('click', () => {
       userCoins += 500;
       updateCoinDisplay();
-      alert("Ad complete! 500 coins added.");
-    }
+      showToast("Ad complete! +500 coins added.");
+    });
 
-    function applyCoupon() {
+    document.getElementById('apply-coupon-btn').addEventListener('click', () => {
       const codeInput = document.getElementById('coupon-input');
       const code = codeInput.value.trim().toUpperCase();
 
-      if (!code) {
-        alert("Please enter a valid coupon code.");
-        return;
-      }
-
-      if (usedCoupons.includes(code)) {
-        alert("You have already redeemed this promo code.");
-        return;
-      }
+      if (!code) return showToast("Please enter a valid coupon code.");
+      if (usedCoupons.includes(code)) return showToast("You have already redeemed this code.");
 
       if (validCoupons[code]) {
         const reward = validCoupons[code];
@@ -542,29 +568,67 @@
         usedCoupons.push(code);
         localStorage.setItem('usedCoupons', JSON.stringify(usedCoupons));
         updateCoinDisplay();
-        alert(`Success! Redeemed ${reward} coins.`);
+        showToast(`Success! Redeemed ${reward} coins.`);
         codeInput.value = '';
       } else {
-        alert("Invalid or expired coupon code.");
+        showToast("Invalid or expired coupon code.");
       }
-    }
+    });
 
-    function triggerScan() {
-      scanCount++;
-      updateCoinDisplay();
-      const historyList = document.getElementById('scan-history');
-      const newEntry = document.createElement('li');
-      newEntry.style.cssText = "padding: 8px 0; border-bottom: 1px solid #334155; color: var(--text-main);";
-      newEntry.innerText = `Scan #${scanCount}: https://example.com/qr-${Math.floor(Math.random() * 8999 + 1000)}`;
-      
-      if (historyList.children[0] && historyList.children[0].innerText.includes("No recent scans")) {
-        historyList.innerHTML = '';
+    // ZXing Real Camera QR Scanner
+    document.getElementById('start-scan-btn').addEventListener('click', async () => {
+      const videoEl = document.getElementById('scanner-viewfinder');
+      const btn = document.getElementById('start-scan-btn');
+
+      if (activeScanning) {
+        codeReader.reset();
+        videoEl.style.display = 'none';
+        btn.innerText = 'Start Camera Scan';
+        activeScanning = false;
+        return;
       }
-      historyList.prepend(newEntry);
-      alert("Camera simulation: Code scanned successfully!");
-    }
 
-    // Initialize stats
+      try {
+        videoEl.style.display = 'block';
+        btn.innerText = 'Stop Camera';
+        activeScanning = true;
+
+        const videoDevices = await codeReader.listVideoInputDevices();
+        const selectedDeviceId = videoDevices[0]?.deviceId;
+
+        codeReader.decodeFromVideoDevice(selectedDeviceId, videoEl, (result, err) => {
+          if (result) {
+            scanCount++;
+            updateCoinDisplay();
+            showToast('Scanned: ' + result.text);
+
+            const historyList = document.getElementById('scan-history');
+            const newEntry = document.createElement('li');
+            newEntry.style.cssText = "padding: 8px 0; border-bottom: 1px solid #334155; color: var(--text-main);";
+            newEntry.innerText = `Scan #${scanCount}: ${result.text}`;
+
+            if (historyList.children[0] && historyList.children[0].innerText.includes("No recent scans")) {
+              historyList.innerHTML = '';
+            }
+            historyList.prepend(newEntry);
+
+            codeReader.reset();
+            videoEl.style.display = 'none';
+            btn.innerText = 'Start Camera Scan';
+            activeScanning = false;
+          }
+        });
+      } catch (err) {
+        showToast('Camera error: ' + err.message);
+        videoEl.style.display = 'none';
+        btn.innerText = 'Start Camera Scan';
+        activeScanning = false;
+      }
+    });
+
+    document.getElementById('help-btn').addEventListener('click', () => showToast("Support email: support@universalscanner.com"));
+    document.getElementById('about-btn').addEventListener('click', () => showToast("Universal Scanner v2.0.0"));
+
     updateCoinDisplay();
   </script>
 </body>
