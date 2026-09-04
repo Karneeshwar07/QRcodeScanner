@@ -21,6 +21,35 @@
 <!-- ZXing: QR/barcode reading library -->
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 <!-- kjua: Lightweight & fast QR generator -->
+  <!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCLC-EhtmE-PrxllWS7E9H0RBVW2SWv4NU",
+    authDomain: "qr-scanner-07.firebaseapp.com",
+    projectId: "qr-scanner-07",
+    storageBucket: "qr-scanner-07.firebasestorage.app",
+    messagingSenderId: "674113177555",
+    appId: "1:674113177555:web:7cd6e92f74d9a4cb491126",
+    measurementId: "G-3EWK0GXR94"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+
+  function loginWithGoogle() {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider)
+      .then((result) => {
+        alert("Welcome, " + result.user.displayName + "!");
+      })
+      .catch((error) => {
+        console.error("Login Error:", error.message);
+      });
+  }
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/kjua/0.9.0/kjua.min.js"></script>
 
 <style>
@@ -517,6 +546,35 @@
     border-radius: 8px;
   }
 </style>
+  <!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCLC-EhtmE-PrxllWS7E9H0RBVW2SWv4NU",
+    authDomain: "qr-scanner-07.firebaseapp.com",
+    projectId: "qr-scanner-07",
+    storageBucket: "qr-scanner-07.firebasestorage.app",
+    messagingSenderId: "674113177555",
+    appId: "1:674113177555:web:7cd6e92f74d9a4cb491126",
+    measurementId: "G-3EWK0GXR94"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+
+  function loginWithGoogle() {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider)
+      .then((result) => {
+        alert("Welcome, " + result.user.displayName + "!");
+      })
+      .catch((error) => {
+        console.error("Login Error:", error.message);
+      });
+  }
+</script>
 </head>
 <body>
 
@@ -527,7 +585,7 @@
     <h1>Scan <span class="accent">anything</span></h1>
     <p class="sub">QR codes, barcodes, ID cards, payment codes.</p>
   </header>
-
+<button onclick="loginWithGoogle()" class="secondaryBtn" style="margin: 10px 0; width: 100%;">🔑 Sign in with Google</button>
   <div class="tabBar" role="tablist">
     <button class="tabBtn active" data-tab="scan" type="button">🔍 Scan</button>
     <button class="tabBtn" data-tab="generate" type="button">➕ Generate</button>
