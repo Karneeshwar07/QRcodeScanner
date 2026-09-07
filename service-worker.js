@@ -22,7 +22,7 @@ const CORE_FILES = [
 const EXTERNAL_RESOURCES = [
   "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
   "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
-  "https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/esm/index.min.js"
+  "https://unpkg.com/@zxing/library@0.20.0/esm/index.min.js"
 ];
 
 // ==========================================
