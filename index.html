@@ -546,27 +546,11 @@
   <div id="toast-container" class="toast-container"></div>
 
   <!-- 6. Application Logic (Firebase Modular SDK v10 & ZXing QR Engine) -->
-  <script type="module">
-       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-     import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { BrowserMultiFormatReader } from 'https://unpkg.com/@zxing/library@0.20.0/esm/index.min.js';
-     const firebaseConfig = {
-       apiKey: "AIzaSyCLC-EhtmE-PrxllWS7E9H0RBVW2SWv4NU",
-       authDomain: "qr-scanner-07.firebaseapp.com",
-       projectId: "qr-scanner-07",
-       storageBucket: "qr-scanner-07.firebasestorage.app",
-       messagingSenderId: "674113177555",
-       appId: "1:674113177555:web:7cd6e92f74d9a4cb491126",
-       measurementId: "G-3EWK0GXR94"
-     };
-
-     const COUPON_CODES = {
-       "WELCOME500": 500,
-       "BONUS1000": 1000,
-       "SCANNER2024": 250,
-       "SUMMERBONUS": 750
-     };
-
+ <script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+  import { BrowserMultiFormatReader } from 'https://unpkg.com/@zxing/library@0.20.0/esm/index.min.js';
+  import { firebaseConfig, COUPON_CODES, CONSTANTS } from './config.js';
      const app = initializeApp(firebaseConfig);
      const auth = getAuth(app);
      const codeReader = new BrowserMultiFormatReader();
