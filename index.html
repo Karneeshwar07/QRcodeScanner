@@ -546,27 +546,330 @@
   <div id="toast-container" class="toast-container"></div>
 
   <!-- 6. Application Logic (Firebase Modular SDK v10 & ZXing QR Engine) -->
- <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-  import { BrowserMultiFormatReader } from 'https://unpkg.com/@zxing/library@0.20.0/esm/index.min.js';
-  import { firebaseConfig, COUPON_CODES, CONSTANTS } from './config.js';
-     const app = initializeApp(firebaseConfig);
-     const auth = getAuth(app);
-     const codeReader = new BrowserMultiFormatReader();
+<!-- Application Logic (Firebase Modular SDK v10 & ZXing QR Engine) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { 
+      getAuth, 
+      GoogleAuthProvider, 
+      signInWithRedirect, 
+      getRedirectResult, 
+      onAuthStateChanged, 
+      signOut 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { BrowserMultiFormatReader } from 'https://unpkg.com/@zxing/library@0.20.0/esm/index.min.js';
+    import { firebaseConfig, COUPON_CODES, CONSTANTS } from './config.js';
+
+    // Initialize Firebase once using imported config
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const codeReader = new BrowserMultiFormatReader();
+
     // ==========================================
-    // IMPROVEMENT #2: Better Toast System with Queue
+    // Toast System
     // ==========================================
-    
     const toastQueue = [];
     let isShowingToast = false;
 
-    function showToast(message, type = 'info', duration = 3000) {
+    function showToast(message, type = 'info', duration = CONSTANTS.TOAST_DURATION_MS) {
       return new Promise((resolve) => {
         toastQueue.push({ message, type, duration, resolve });
         processToastQueue();
       });
     }
+
+    function processToastQueue() {
+      if (isShowingToast || toastQueue.length === 0) return;
+      
+      isShowingToast = true;
+      const { message, type, duration, resolve } = toastQueue.shift();
+      
+      const container = document.getElementById('toast-container');
+      const t = document.createElement('div');
+      t.className = `toast ${type}`;
+      t.innerText = message;
+      t.setAttribute('role', 'alert');
+      t.setAttribute('aria-live', 'polite');
+      
+      container.appendChild(t);
+      
+      setTimeout(() => {
+        t.classList.add('removing');
+        setTimeout(() => {
+          t.remove();
+          isShowingToast = false;
+          resolve();
+          processToastQueue();
+        }, 300);
+      }, duration - 300);
+    }
+
+    // ==========================================
+    // State Management
+    // ==========================================
+    let userCoins = Math.max(0, parseInt(localStorage.getItem('userCoins') || '0'));
+    let scanCount = Math.max(0, parseInt(localStorage.getItem('scanCount') || '0'));
+    let usedCoupons = JSON.parse(localStorage.getItem('usedCoupons') || '[]');
+    let activeScanning = false;
+    let lastScanTime = 0;
+
+    // ==========================================
+    // Camera Cleanup
+    // ==========================================
+    function stopCamera() {
+      try {
+        const videoEl = document.getElementById('scanner-viewfinder');
+        if (videoEl && videoEl.srcObject) {
+          videoEl.srcObject.getTracks().forEach(track => track.stop());
+          videoEl.srcObject = null;
+        }
+        codeReader.reset();
+      } catch (err) {
+        console.error('Error stopping camera:', err);
+      }
+    }
+
+    // ==========================================
+    // Auth Listener & Redirect Result Handler
+    // ==========================================
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result && result.user) {
+          showToast(`Welcome back, ${result.user.displayName || 'user'}!`, 'success');
+        }
+      })
+      .catch((error) => {
+        console.error("Redirect sign-in error:", error);
+        showToast(`Login error: ${error.message}`, 'error');
+      });
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        showDashboard(user);
+      } else {
+        showLoginScreen();
+      }
+    });
+
+    // ==========================================
+    // Google Sign-In Click Listener
+    // ==========================================
+    document.getElementById('login-btn').addEventListener('click', () => {
+      const provider = new GoogleAuthProvider();
+      signInWithRedirect(auth, provider).catch((err) => {
+        showToast(`Login error: ${err.message}`, 'error');
+        console.error('Auth error:', err);
+      });
+    });
+
+    // ==========================================
+    // Logout Handler
+    // ==========================================
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      stopCamera();
+      try {
+        await signOut(auth);
+        showLoginScreen();
+        await showToast("Signed out successfully.", 'success');
+      } catch (err) {
+        await showToast("Logout error: " + err.message, 'error');
+      }
+    });
+
+    // ==========================================
+    // Navigation & Router
+    // ==========================================
+    function navigateTo(pageId, navElement) {
+      document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+      document.getElementById(pageId).classList.add('active');
+
+      document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+      if (navElement) {
+        navElement.classList.add('active');
+      } else {
+        const matchingNav = document.querySelector(`.nav-item[data-page="${pageId}"]`);
+        if (matchingNav) matchingNav.classList.add('active');
+      }
+
+      if (pageId !== 'scanner-page' && activeScanning) {
+        stopCamera();
+        activeScanning = false;
+        document.getElementById('start-scan-btn').innerText = 'Start Camera Scan';
+      }
+    }
+
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const pageId = e.currentTarget.getAttribute('data-page');
+        navigateTo(pageId, e.currentTarget);
+      });
+    });
+
+    document.getElementById('coin-plus-btn').addEventListener('click', () => navigateTo('rewards-page'));
+
+    function showDashboard(user) {
+      document.getElementById('auth-screen').style.display = 'none';
+      document.getElementById('main-header').style.display = 'flex';
+      document.getElementById('app-container').style.display = 'flex';
+      document.getElementById('main-nav').style.display = 'flex';
+      document.getElementById('user-display').innerText = "Signed in as: " + (user.displayName || user.email);
+      updateCoinDisplay();
+    }
+
+    function showLoginScreen() {
+      document.getElementById('auth-screen').style.display = 'flex';
+      document.getElementById('main-header').style.display = 'none';
+      document.getElementById('app-container').style.display = 'none';
+      document.getElementById('main-nav').style.display = 'none';
+    }
+
+    function updateCoinDisplay() {
+      document.getElementById('coin-count').innerText = userCoins;
+      document.getElementById('stat-coins').innerText = userCoins;
+      document.getElementById('stat-scans').innerText = scanCount;
+      localStorage.setItem('userCoins', userCoins.toString());
+      localStorage.setItem('scanCount', scanCount.toString());
+    }
+
+    // ==========================================
+    // Ads & Coupons
+    // ==========================================
+    document.getElementById('watch-ad-btn').addEventListener('click', async () => {
+      userCoins += 500;
+      updateCoinDisplay();
+      await showToast("Ad complete! +500 coins added.", 'success');
+    });
+
+    document.getElementById('apply-coupon-btn').addEventListener('click', async () => {
+      const codeInput = document.getElementById('coupon-input');
+      const code = codeInput.value.trim().toUpperCase();
+
+      if (!code) {
+        await showToast("Please enter a valid coupon code.", 'error');
+        return;
+      }
+
+      if (code.length < 3 || code.length > 20) {
+        await showToast("Coupon code must be between 3-20 characters.", 'error');
+        return;
+      }
+
+      if (usedCoupons.includes(code)) {
+        await showToast("You have already redeemed this code.", 'error');
+        return;
+      }
+
+      if (COUPON_CODES[code]) {
+        const reward = COUPON_CODES[code];
+        userCoins += reward;
+        usedCoupons.push(code);
+        localStorage.setItem('usedCoupons', JSON.stringify(usedCoupons));
+        updateCoinDisplay();
+        await showToast(`Success! Redeemed ${reward} coins.`, 'success');
+        codeInput.value = '';
+      } else {
+        await showToast("Invalid or expired coupon code.", 'error');
+      }
+    });
+
+    // ==========================================
+    // Camera QR Scanner
+    // ==========================================
+    document.getElementById('start-scan-btn').addEventListener('click', async () => {
+      const videoEl = document.getElementById('scanner-viewfinder');
+      const btn = document.getElementById('start-scan-btn');
+      const errorDiv = document.getElementById('camera-error');
+
+      if (activeScanning) {
+        stopCamera();
+        videoEl.style.display = 'none';
+        btn.innerText = 'Start Camera Scan';
+        activeScanning = false;
+        errorDiv.style.display = 'none';
+        return;
+      }
+
+      try {
+        errorDiv.style.display = 'none';
+        videoEl.style.display = 'block';
+        btn.innerText = 'Stop Camera';
+        btn.disabled = true;
+        activeScanning = true;
+
+        const videoDevices = await codeReader.listVideoInputDevices();
+        if (videoDevices.length === 0) {
+          throw new Error('No camera found. Please check permissions.');
+        }
+
+        const selectedDeviceId = videoDevices[0]?.deviceId;
+
+        codeReader.decodeFromVideoDevice(selectedDeviceId, videoEl, (result, err) => {
+          if (result) {
+            const now = Date.now();
+            if (now - lastScanTime < CONSTANTS.SCAN_COOLDOWN_MS) {
+              return;
+            }
+            lastScanTime = now;
+
+            scanCount++;
+            updateCoinDisplay();
+            showToast('Scanned: ' + result.text, 'success');
+
+            const historyList = document.getElementById('scan-history');
+            const newEntry = document.createElement('li');
+            newEntry.style.cssText = "padding: 8px 0; border-bottom: 1px solid #334155; color: var(--text-main);";
+            newEntry.innerText = `Scan #${scanCount}: ${result.text}`;
+
+            if (historyList.children[0] && historyList.children[0].innerText.includes("No recent scans")) {
+              historyList.innerHTML = '';
+            }
+            historyList.prepend(newEntry);
+
+            stopCamera();
+            videoEl.style.display = 'none';
+            btn.innerText = 'Start Camera Scan';
+            activeScanning = false;
+            btn.disabled = false;
+          }
+        });
+        btn.disabled = false;
+      } catch (err) {
+        errorDiv.textContent = err.message;
+        errorDiv.style.display = 'block';
+        await showToast('Camera error: ' + err.message, 'error');
+        videoEl.style.display = 'none';
+        btn.innerText = 'Start Camera Scan';
+        activeScanning = false;
+        btn.disabled = false;
+      }
+    });
+
+    // ==========================================
+    // Support Links
+    // ==========================================
+    document.getElementById('help-btn').addEventListener('click', async () => {
+      await showToast("Support email: support@universalscanner.com", 'info');
+    });
+
+    document.getElementById('about-btn').addEventListener('click', async () => {
+      await showToast("Universal Scanner v2.0.0 - Improved Security & Performance", 'info');
+    });
+
+    document.getElementById('privacy-btn').addEventListener('click', async () => {
+      await showToast("Privacy Policy: Your data is encrypted end-to-end.", 'info');
+    });
+
+    // ==========================================
+    // Service Worker Registration
+    // ==========================================
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./service-worker.js')
+        .then(reg => console.log('Service Worker registered'))
+        .catch(err => console.log('Service Worker registration failed:', err));
+    }
+
+    updateCoinDisplay();
+  </script>
 
     function processToastQueue() {
       if (isShowingToast || toastQueue.length === 0) return;
