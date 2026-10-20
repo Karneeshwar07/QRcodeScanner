@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#07121f" />
+    <meta name="description" content="Universal Scanner — scan, create, save, and understand QR codes and barcodes." />
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="icon" href="./icon-192.png" type="image/png" />
+    <link rel="stylesheet" href="./src/styles.css" />
+    <title>Universal Scanner</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand"><span class="brand-mark">◈</span><div><strong>Universal</strong><span>SCANNER</span></div></div>
+        <div class="top-actions"><span class="connection-chip" id="connection-chip">● Online</span><button class="coin-chip" data-go="rewards" aria-label="Open rewards"><span>🪙</span><strong id="coin-count">0</strong></button></div>
+      </header>
+      <main>
+        <section class="page active" id="scan-page" aria-label="Scan">
+          <div class="page-heading"><div><p class="eyebrow">SMART SCAN</p><h1>What are we scanning?</h1></div><button class="icon-button" id="sound-button" aria-label="Toggle scan sound">🔊</button></div>
+          <div class="camera-card" id="camera-card">
+            <video id="scanner-video" playsinline muted></video>
+            <div class="camera-placeholder" id="camera-placeholder"><span>⌁</span><strong>Ready when you are</strong><small>Point your camera at a QR code or barcode</small></div>
+            <div class="scanner-overlay" aria-hidden="true"><i class="corner c1"></i><i class="corner c2"></i><i class="corner c3"></i><i class="corner c4"></i><b class="scan-line"></b></div>
+            <div class="camera-status" id="camera-status">CAMERA OFF</div>
+          </div>
+          <div class="scan-controls">
+            <button class="round-control" id="flash-button" disabled><span>⚡</span>Flash</button>
+            <button class="scan-button" id="camera-button"><span>⌁</span><span>Start scan</span></button>
+            <label class="round-control file-control"><input type="file" id="gallery-input" accept="image/*" /><span>▣</span>Gallery</label>
+            <button class="round-control" id="camera-switch" disabled><span>⟳</span>Switch</button>
+          </div>
+          <div class="result-card hidden" id="result-card" aria-live="polite">
+            <div class="result-top"><span class="result-icon" id="result-icon">✓</span><div><p class="eyebrow" id="result-kicker">CODE DETECTED</p><h2 id="result-title">Website</h2></div><button class="icon-button result-close" id="result-close" aria-label="Close result">×</button></div>
+            <p class="result-value" id="result-value"></p><div class="safety-pill" id="safety-pill"></div>
+            <div class="result-actions" id="result-actions"></div><p class="coins-earned" id="coins-earned">+10 coins earned</p>
+          </div>
+          <div class="mission-strip" id="scan-mission-strip"></div>
+        </section>
+        <section class="page" id="create-page" aria-label="Create QR code">
+          <div class="page-heading"><div><p class="eyebrow">QR STUDIO</p><h1>Create something useful</h1></div></div>
+          <div class="template-grid" id="template-grid"></div>
+          <div class="create-layout"><form class="form-card" id="generator-form"><div id="generator-fields"></div><button class="primary-button" type="submit">Generate QR code <span>→</span></button></form>
+            <div class="qr-preview-card"><div class="qr-paper"><canvas id="qr-canvas" width="280" height="280"></canvas></div><p id="qr-preview-label">Your QR code will appear here</p><div class="preview-actions"><button class="secondary-button" id="download-qr" disabled>Download</button><button class="secondary-button" id="share-qr" disabled>Share</button></div></div>
+          </div>
+        </section>
+        <section class="page" id="history-page" aria-label="History">
+          <div class="page-heading"><div><p class="eyebrow">YOUR LIBRARY</p><h1>Scan history</h1></div><button class="icon-button" id="clear-history" aria-label="Clear scan history">⌫</button></div>
+          <div class="stat-grid" id="statistics"></div>
+          <div class="history-tools"><label class="search-box">⌕<input id="history-search" placeholder="Search scans" /></label><select id="history-filter" aria-label="Filter scan history"><option value="all">All types</option><option value="url">Websites</option><option value="product">Products</option><option value="wifi">Wi‑Fi</option><option value="text">Text</option></select></div>
+          <div class="history-list" id="history-list"></div>
+        </section>
+        <section class="page" id="rewards-page" aria-label="Rewards">
+          <div class="page-heading"><div><p class="eyebrow">YOUR PROGRESS</p><h1>Keep the streak alive</h1></div></div>
+          <div class="level-card"><div><span class="level-badge" id="level-badge">LVL 1</span><h2 id="reward-coins">0 coins</h2><p id="level-copy">Your next milestone is waiting.</p></div><div class="streak"><span>🔥</span><strong id="streak-count">0</strong><small>day streak</small></div><div class="level-progress"><i id="level-progress"></i></div></div>
+          <section class="content-card"><div class="section-title"><div><p class="eyebrow">TODAY</p><h2>Daily missions</h2></div><span id="mission-total">0%</span></div><div id="mission-list" class="mission-list"></div></section>
+          <section class="content-card"><div class="section-title"><div><p class="eyebrow">COLLECTION</p><h2>Achievements</h2></div></div><div class="achievement-grid" id="achievement-grid"></div></section>
+          <section class="content-card"><div class="section-title"><div><p class="eyebrow">REWARDS STORE</p><h2>Spend your coins</h2></div><span class="tiny-note">Local preview</span></div><div class="store-list" id="store-list"></div><div id="redemption-list" class="redemption-list"></div></section>
+        </section>
+        <section class="page" id="settings-page" aria-label="Settings">
+          <div class="page-heading"><div><p class="eyebrow">CONTROL CENTER</p><h1>Settings</h1></div></div>
+          <section class="profile-card"><div class="avatar">G</div><div><h2>Guest mode</h2><p>Your scans are saved only on this device.</p></div><span class="guest-badge">LOCAL</span></section>
+          <section class="content-card"><div class="section-title"><div><p class="eyebrow">SCAN EXPERIENCE</p><h2>Preferences</h2></div></div><label class="setting-row"><span><strong>Scan sound</strong><small>Play a short success sound</small></span><input type="checkbox" id="sound-toggle" class="switch" checked /></label><label class="setting-row"><span><strong>Haptic feedback</strong><small>Vibrate after a successful scan</small></span><input type="checkbox" id="haptic-toggle" class="switch" checked /></label></section>
+          <section class="content-card"><div class="section-title"><div><p class="eyebrow">APP</p><h2>Install & updates</h2></div></div><p class="card-copy">Install Universal Scanner for fast access and an offline-friendly workspace.</p><div class="button-row"><button class="secondary-button" id="install-button" disabled>Install app</button><button class="secondary-button" id="update-button">Check for update</button></div></section>
+          <section class="content-card"><div class="section-title"><div><p class="eyebrow">CLOUD SYNC</p><h2>Coming after sign-in</h2></div><span class="sync-dot">●</span></div><p class="card-copy">Your history, rewards, and redemptions stay safely on this device while Guest mode is active. Re-enable Google sign-in later to sync them with Firebase.</p></section>
+        </section>
+      </main>
+      <nav class="bottom-nav" aria-label="Main navigation"><button class="nav-item active" data-page="scan"><span>⌁</span>Scan</button><button class="nav-item" data-page="create"><span>＋</span>Create</button><button class="nav-item" data-page="history"><span>◷</span>History</button><button class="nav-item" data-page="rewards"><span>◈</span>Rewards</button><button class="nav-item" data-page="settings"><span>⚙</span>Settings</button></nav>
+    </div>
+    <div class="toast-region" id="toast-region" aria-live="polite"></div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
